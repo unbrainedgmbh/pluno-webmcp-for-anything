@@ -135,13 +135,14 @@ function buildRegistrationExpression(tools) {
     for (const definition of definitions) {
       document.modelContext.unregisterTool?.(definition.name);
       const execute = (0, eval)("(" + definition.code + ")");
-      document.modelContext.registerTool({
+      const registration = {
         name: definition.name,
         description: definition.description,
         inputSchema: definition.inputSchema,
-        annotations: definition.annotations,
         execute
-      });
+      };
+      if (definition.annotations) registration.annotations = definition.annotations;
+      document.modelContext.registerTool(registration);
     }
   })()`;
 }
