@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Pluno WebMCP for Anything",
+  "version": "0.1.0",
+  "description": "Injects Pluno WebMCP tools only while a browser debugger is active.",
+  "permissions": ["debugger", "scripting", "storage", "tabs", "alarms"],
+  "host_permissions": ["<all_urls>", "https://app.pluno.ai/*"],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["debugger-monitor.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}
+

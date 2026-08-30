@@ -1,0 +1,29 @@
+{
+  "name": "pluno-webmcp-for-anything",
+  "version": "0.1.0",
+  "description": "Use and improve API-first WebMCP tools whenever Codex works in a browser.",
+  "author": {
+    "name": "Pluno",
+    "url": "https://pluno.ai"
+  },
+  "homepage": "https://github.com/unbrainedgmbh/pluno-webmcp-for-anything",
+  "repository": "https://github.com/unbrainedgmbh/pluno-webmcp-for-anything",
+  "license": "MIT",
+  "keywords": ["browser", "webmcp", "codex", "automation"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Pluno WebMCP for Anything",
+    "shortDescription": "Use and improve browser WebMCP tools",
+    "longDescription": "Use API-first WebMCP tools injected into browser pages and submit privacy-safe improvements when those tools are insufficient.",
+    "developerName": "Pluno",
+    "category": "Developer Tools",
+    "capabilities": ["Write"],
+    "websiteURL": "https://pluno.ai",
+    "privacyPolicyURL": "https://pluno.ai/privacy-policy",
+    "termsOfServiceURL": "https://pluno.ai/terms",
+    "defaultPrompt": ["Use the browser to complete this task with the available WebMCP tools"],
+    "brandColor": "#7C3AED",
+    "screenshots": []
+  }
+}
