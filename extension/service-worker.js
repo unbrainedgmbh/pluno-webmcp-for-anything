@@ -27,6 +27,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.tabs.onRemoved.addListener((tabId) => tabState.delete(tabId));
 
 async function checkDebuggerActivity(tabId, pageUrl) {
+  if (pageUrl.startsWith(`${API_ORIGIN}/webmcp/signup`)) await exchangePairing();
   const targets = await chrome.debugger.getTargets();
   const active = targets.some((target) => target.tabId === tabId && target.attached);
   const previous = tabState.get(tabId) ?? { active: false, url: null, toolNames: [] };
