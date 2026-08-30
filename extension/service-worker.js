@@ -3,6 +3,7 @@ const PAIRING_ALARM = "webmcp-pairing";
 const DEBUGGER_PROTOCOL_VERSION = "1.3";
 const INJECTION_RETRY_MS = 250;
 const INJECTION_RETRY_LIMIT = 40;
+const CLEANUP_GRACE_MS = 2000;
 const tabState = new Map();
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
@@ -30,22 +31,47 @@ async function checkDebuggerActivity(tabId, pageUrl) {
   if (pageUrl.startsWith(`${API_ORIGIN}/webmcp/signup`)) await exchangePairing();
   const targets = await chrome.debugger.getTargets();
   const active = targets.some((target) => target.tabId === tabId && target.attached);
-  const previous = tabState.get(tabId) ?? { active: false, url: null, toolNames: [] };
+  const previous = tabState.get(tabId) ?? {
+    active: false,
+    url: null,
+    toolNames: [],
+    loaded: false,
+    injecting: false,
+    cleanupAfter: 0,
+  };
   tabState.set(tabId, { ...previous, active, url: pageUrl });
 
-  if (active && (!previous.active || previous.url !== pageUrl)) {
-    activateTab(tabId, pageUrl);
-  } else if (!active && previous.active) {
+  if (
+    active &&
+    !previous.injecting &&
+    (!previous.active || previous.url !== pageUrl || !previous.loaded)
+  ) {
+    activateTab(tabId, pageUrl).catch(async () => {
+      const current = tabState.get(tabId) ?? previous;
+      tabState.set(tabId, { ...current, injecting: false });
+      await logPageError(tabId, "Pluno WebMCP could not inject tools.");
+    });
+  } else if (!active && !previous.injecting && previous.loaded && Date.now() >= previous.cleanupAfter) {
     await unregisterTools(tabId, previous.toolNames);
-    tabState.set(tabId, { ...previous, active: false, url: pageUrl, toolNames: [] });
+    tabState.set(tabId, {
+      ...previous,
+      active: false,
+      url: pageUrl,
+      toolNames: [],
+      loaded: false,
+      cleanupAfter: 0,
+    });
   }
   return { active };
 }
 
 async function activateTab(tabId, pageUrl) {
+  const initial = tabState.get(tabId) ?? { active: true, url: pageUrl, toolNames: [] };
+  tabState.set(tabId, { ...initial, injecting: true });
   const { webmcpToken } = await chrome.storage.local.get("webmcpToken");
   if (!webmcpToken) {
     await logSetupError(tabId);
+    tabState.set(tabId, { ...initial, injecting: false });
     return;
   }
   const response = await fetch(`${API_ORIGIN}/webmcp/tools?page_url=${encodeURIComponent(pageUrl)}`, {
@@ -53,16 +79,24 @@ async function activateTab(tabId, pageUrl) {
   });
   if (response.status === 403) {
     await logPluginError(tabId);
+    tabState.set(tabId, { ...initial, injecting: false });
     return;
   }
   if (!response.ok) {
     await logPageError(tabId, `Pluno WebMCP could not load tools (${response.status}).`);
+    tabState.set(tabId, { ...initial, injecting: false });
     return;
   }
   const { tools } = await response.json();
-  await injectThroughDebugger(tabId, tools);
+  const injected = await injectThroughDebugger(tabId, tools);
   const current = tabState.get(tabId) ?? { active: true, url: pageUrl };
-  tabState.set(tabId, { ...current, toolNames: tools.map((tool) => tool.name) });
+  tabState.set(tabId, {
+    ...current,
+    injecting: false,
+    toolNames: injected ? tools.map((tool) => tool.name) : [],
+    loaded: injected,
+    cleanupAfter: injected ? Date.now() + CLEANUP_GRACE_MS : 0,
+  });
 }
 
 async function injectThroughDebugger(tabId, tools) {
@@ -77,11 +111,12 @@ async function injectThroughDebugger(tabId, tools) {
         returnByValue: true,
       });
       await chrome.debugger.detach(target);
-      return;
+      return true;
     }
     await delay(INJECTION_RETRY_MS);
   }
   await logPageError(tabId, "Pluno WebMCP could not inject tools while the browser debugger was busy.");
+  return false;
 }
 
 function buildRegistrationExpression(tools) {
@@ -112,7 +147,6 @@ function buildRegistrationExpression(tools) {
 }
 
 async function unregisterTools(tabId, toolNames) {
-  if (!toolNames.length) return;
   await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
