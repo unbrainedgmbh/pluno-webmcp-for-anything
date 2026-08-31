@@ -4,18 +4,34 @@ import vm from "node:vm";
 
 let debuggerTargets = [];
 const requestedUrls = [];
+const createdTabUrls = [];
+const storedValues = {
+  webmcpPairingSecret: "stale-pairing-secret",
+  webmcpToken: "token",
+};
 
 globalThis.chrome = {
   action: { onClicked: { addListener() {} } },
-  alarms: { onAlarm: { addListener() {} } },
+  alarms: {
+    async clear() {},
+    async create() {},
+    onAlarm: { addListener() {} },
+  },
   runtime: {
+    getManifest: () => ({ version: "0.1.6" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
   },
   storage: {
     local: {
-      async get() {
-        return { webmcpToken: "token" };
+      async get(key) {
+        return { [key]: storedValues[key] };
+      },
+      async set(values) {
+        Object.assign(storedValues, values);
+      },
+      async remove(key) {
+        delete storedValues[key];
       },
     },
   },
@@ -29,6 +45,9 @@ globalThis.chrome = {
   },
   scripting: { async executeScript() {} },
   tabs: {
+    async create({ url }) {
+      createdTabUrls.push(url);
+    },
     async get(tabId) {
       return { id: tabId, url: `https://tab-${tabId}.example/page` };
     },
@@ -47,7 +66,7 @@ globalThis.fetch = async (url) => {
   };
 };
 
-const { buildRegistrationExpression, checkDebuggerActivity, getAttachedTabIds, getStatus } =
+const { buildRegistrationExpression, checkDebuggerActivity, getAttachedTabIds, getStatus, openSetup } =
   await import("./service-worker.js");
 
 const definition = {
@@ -105,6 +124,18 @@ test("reports paired idle status before an AI agent activates a tab", async () =
     toolCount: 0,
     lastError: null,
   });
+});
+
+test("starts each setup attempt with a fresh pairing secret", async () => {
+  const previousPairingSecret = storedValues.webmcpPairingSecret;
+
+  await openSetup();
+
+  assert.notEqual(storedValues.webmcpPairingSecret, previousPairingSecret);
+  assert.equal(
+    createdTabUrls.at(-1),
+    `https://app.pluno.ai/webmcp/signup?pairing_secret=${encodeURIComponent(storedValues.webmcpPairingSecret)}`,
+  );
 });
 
 test("finds every debugger-attached tab without including unrelated targets", () => {

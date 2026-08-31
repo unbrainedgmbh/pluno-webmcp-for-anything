@@ -272,8 +272,9 @@ async function exchangePairing() {
 }
 
 async function openSetup() {
-  const stored = await chrome.storage.local.get("webmcpPairingSecret");
-  const pairingSecret = stored.webmcpPairingSecret ?? randomSecret();
+  // A previous setup page may have consumed or expired its one-time pairing. Every explicit setup attempt needs a
+  // fresh secret so reinstalling or reconnecting cannot reopen an unusable pairing URL.
+  const pairingSecret = randomSecret();
   await chrome.storage.local.set({ webmcpPairingSecret: pairingSecret });
   await createPairing(pairingSecret);
   await chrome.alarms.create(PAIRING_ALARM, { periodInMinutes: 1 });
@@ -289,4 +290,4 @@ function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-export { buildRegistrationExpression, checkDebuggerActivity, getAttachedTabIds, getStatus };
+export { buildRegistrationExpression, checkDebuggerActivity, getAttachedTabIds, getStatus, openSetup };
