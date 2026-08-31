@@ -3,16 +3,14 @@ const PAIRING_ALARM = "webmcp-pairing";
 const DEBUGGER_PROTOCOL_VERSION = "1.3";
 const INJECTION_RETRY_MS = 250;
 const INJECTION_RETRY_LIMIT = 40;
-const CLEANUP_GRACE_MS = 2000;
+const PLUGIN_ERROR =
+  "The Pluno WebMCP for Anything integration is not connected in Claude/Codex.";
+const SETUP_ERROR = "Extension setup is incomplete.";
 const tabState = new Map();
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason !== "install") return;
-  const pairingSecret = randomSecret();
-  await chrome.storage.local.set({ webmcpPairingSecret: pairingSecret });
-  await createPairing(pairingSecret);
-  await chrome.alarms.create(PAIRING_ALARM, { periodInMinutes: 1 });
-  await chrome.tabs.create({ url: `${API_ORIGIN}/webmcp/signup?pairing_secret=${encodeURIComponent(pairingSecret)}` });
+  await openSetup();
 });
 
 chrome.alarms.onAlarm.addListener(async ({ name }) => {
@@ -20,9 +18,19 @@ chrome.alarms.onAlarm.addListener(async ({ name }) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "WEBMCP_CHECK_DEBUGGER" || sender.tab?.id === undefined) return false;
-  checkDebuggerActivity(sender.tab.id, message.pageUrl).then(sendResponse);
-  return true;
+  if (message?.type === "WEBMCP_CHECK_DEBUGGER" && sender.tab?.id !== undefined) {
+    checkDebuggerActivity(sender.tab.id, message.pageUrl).then(sendResponse);
+    return true;
+  }
+  if (message?.type === "WEBMCP_GET_STATUS") {
+    getStatus(message.tabId).then(sendResponse);
+    return true;
+  }
+  if (message?.type === "WEBMCP_OPEN_SETUP") {
+    openSetup().then(() => sendResponse({ opened: true }));
+    return true;
+  }
+  return false;
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => tabState.delete(tabId));
@@ -30,61 +38,84 @@ chrome.tabs.onRemoved.addListener((tabId) => tabState.delete(tabId));
 async function checkDebuggerActivity(tabId, pageUrl) {
   if (pageUrl.startsWith(`${API_ORIGIN}/webmcp/signup`)) await exchangePairing();
   const targets = await chrome.debugger.getTargets();
-  const active = targets.some((target) => target.tabId === tabId && target.attached);
+  const attachedTabIds = getAttachedTabIds(targets);
+  const attachedTabIdSet = new Set(attachedTabIds);
+  for (const [knownTabId, state] of tabState) {
+    if (!attachedTabIdSet.has(knownTabId)) {
+      tabState.set(knownTabId, { ...state, active: false });
+    }
+  }
+  await Promise.all(
+    attachedTabIds.map(async (attachedTabId) => {
+      const attachedPageUrl =
+        attachedTabId === tabId
+          ? pageUrl
+          : await chrome.tabs.get(attachedTabId).then((tab) => tab.url).catch(() => undefined);
+      if (attachedPageUrl) await activateAttachedTab(attachedTabId, attachedPageUrl);
+    }),
+  );
+  return { active: attachedTabIdSet.has(tabId) };
+}
+
+async function activateAttachedTab(tabId, pageUrl) {
   const previous = tabState.get(tabId) ?? {
     active: false,
     url: null,
     toolNames: [],
     loaded: false,
     injecting: false,
-    cleanupAfter: 0,
+    lastError: null,
   };
-  tabState.set(tabId, { ...previous, active, url: pageUrl });
+  tabState.set(tabId, { ...previous, active: true, url: pageUrl });
 
   if (
-    active &&
     !previous.injecting &&
-    (!previous.active || previous.url !== pageUrl || !previous.loaded)
+    (previous.url !== pageUrl || !previous.loaded)
   ) {
-    activateTab(tabId, pageUrl).catch(async () => {
+    activateTab(tabId, pageUrl, previous.url !== pageUrl ? previous.toolNames : []).catch(async () => {
       const current = tabState.get(tabId) ?? previous;
-      tabState.set(tabId, { ...current, injecting: false });
+      tabState.set(tabId, { ...current, injecting: false, loaded: false, lastError: "Tool injection failed." });
       await logPageError(tabId, "Pluno WebMCP could not inject tools.");
     });
-  } else if (!active && !previous.injecting && previous.loaded && Date.now() >= previous.cleanupAfter) {
-    await unregisterTools(tabId, previous.toolNames);
-    tabState.set(tabId, {
-      ...previous,
-      active: false,
-      url: pageUrl,
-      toolNames: [],
-      loaded: false,
-      cleanupAfter: 0,
-    });
   }
-  return { active };
 }
 
-async function activateTab(tabId, pageUrl) {
+function getAttachedTabIds(targets) {
+  return [
+    ...new Set(
+      targets
+        .filter((target) => target.attached && target.tabId !== undefined)
+        .map((target) => target.tabId),
+    ),
+  ];
+}
+
+async function activateTab(tabId, pageUrl, staleToolNames) {
   const initial = tabState.get(tabId) ?? { active: true, url: pageUrl, toolNames: [] };
-  tabState.set(tabId, { ...initial, injecting: true });
+  tabState.set(tabId, { ...initial, injecting: true, lastError: null });
+  if (staleToolNames.length) await unregisterTools(tabId, staleToolNames);
   const { webmcpToken } = await chrome.storage.local.get("webmcpToken");
   if (!webmcpToken) {
     await logSetupError(tabId);
-    tabState.set(tabId, { ...initial, injecting: false });
+    tabState.set(tabId, { ...initial, injecting: false, loaded: false, lastError: SETUP_ERROR });
     return;
   }
-  const response = await fetch(`${API_ORIGIN}/webmcp/tools?page_url=${encodeURIComponent(pageUrl)}`, {
+  const response = await fetch(`${API_ORIGIN}/api/webmcp/tools?page_url=${encodeURIComponent(pageUrl)}`, {
     headers: { Authorization: `Bearer ${webmcpToken}` },
   });
   if (response.status === 403) {
     await logPluginError(tabId);
-    tabState.set(tabId, { ...initial, injecting: false });
+    tabState.set(tabId, { ...initial, injecting: false, loaded: false, lastError: PLUGIN_ERROR });
     return;
   }
   if (!response.ok) {
     await logPageError(tabId, `Pluno WebMCP could not load tools (${response.status}).`);
-    tabState.set(tabId, { ...initial, injecting: false });
+    tabState.set(tabId, {
+      ...initial,
+      injecting: false,
+      loaded: false,
+      lastError: `Could not load tools (${response.status}).`,
+    });
     return;
   }
   const { tools } = await response.json();
@@ -95,8 +126,21 @@ async function activateTab(tabId, pageUrl) {
     injecting: false,
     toolNames: injected ? tools.map((tool) => tool.name) : [],
     loaded: injected,
-    cleanupAfter: injected ? Date.now() + CLEANUP_GRACE_MS : 0,
+    lastError: injected ? null : "Tool injection failed while the browser debugger was busy.",
   });
+}
+
+async function getStatus(tabId) {
+  const { webmcpToken } = await chrome.storage.local.get("webmcpToken");
+  const state = typeof tabId === "number" ? tabState.get(tabId) : undefined;
+  return {
+    paired: Boolean(webmcpToken),
+    active: state?.active ?? false,
+    injecting: state?.injecting ?? false,
+    loaded: state?.loaded ?? false,
+    toolCount: state?.toolNames?.length ?? 0,
+    lastError: state?.lastError ?? null,
+  };
 }
 
 async function injectThroughDebugger(tabId, tools) {
@@ -123,23 +167,33 @@ function buildRegistrationExpression(tools) {
   const serialized = JSON.stringify(tools);
   return `(() => {
     const definitions = ${serialized};
-    if (!document.modelContext?.registerTool) {
-      console.error("Pluno WebMCP could not inject tools because this page does not expose the WebMCP API.");
-      return;
-    }
+    // External Chrome remains useful before native WebMCP is enabled because the agent can call this registry through code.
+    const callableTools = definitions.map((definition) => {
+      let implementation;
+      return Object.freeze({
+        ...definition,
+        execute: async (input) => {
+          implementation ??= (0, eval)("(" + definition.code + ")");
+          if (typeof implementation !== "function") {
+            throw new TypeError("Pluno WebMCP tool " + definition.name + " did not evaluate to a function.");
+          }
+          return implementation(input);
+        }
+      });
+    });
     Object.defineProperty(globalThis, "__PLUNO_WEBMCP_TOOLS__", {
-      value: definitions,
+      value: Object.freeze(callableTools),
       configurable: true,
       enumerable: false
     });
-    for (const definition of definitions) {
+    if (!document.modelContext?.registerTool) return;
+    for (const definition of callableTools) {
       document.modelContext.unregisterTool?.(definition.name);
-      const execute = (0, eval)("(" + definition.code + ")");
       const registration = {
         name: definition.name,
         description: definition.description,
         inputSchema: definition.inputSchema,
-        execute
+        execute: definition.execute
       };
       if (definition.annotations) registration.annotations = definition.annotations;
       document.modelContext.registerTool(registration);
@@ -162,14 +216,14 @@ async function unregisterTools(tabId, toolNames) {
 async function logPluginError(tabId) {
   await logPageError(
     tabId,
-    "Pluno WebMCP tools were not injected because the Pluno WebMCP for Anything plugin is not connected to Codex.",
+    `Pluno WebMCP tools were not injected because ${PLUGIN_ERROR}`,
   );
 }
 
 async function logSetupError(tabId) {
   await logPageError(
     tabId,
-    "Pluno WebMCP tools were not injected because setup is incomplete. Install and connect the Pluno WebMCP for Anything Codex plugin.",
+    `Pluno WebMCP tools were not injected because ${SETUP_ERROR} Install and connect the Pluno WebMCP for Anything integration in Claude/Codex.`,
   );
 }
 
@@ -183,7 +237,7 @@ async function logPageError(tabId, message) {
 }
 
 async function createPairing(pairingSecret) {
-  await fetch(`${API_ORIGIN}/webmcp/extension/pairings`, {
+  await fetch(`${API_ORIGIN}/api/webmcp/extension/pairings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pairing_secret: pairingSecret, extension_version: chrome.runtime.getManifest().version }),
@@ -196,7 +250,7 @@ async function exchangePairing() {
     await chrome.alarms.clear(PAIRING_ALARM);
     return;
   }
-  const response = await fetch(`${API_ORIGIN}/webmcp/extension/pairings/exchange`, {
+  const response = await fetch(`${API_ORIGIN}/api/webmcp/extension/pairings/exchange`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -211,7 +265,19 @@ async function exchangePairing() {
     await chrome.storage.local.remove("webmcpPairingSecret");
     await chrome.alarms.clear(PAIRING_ALARM);
   }
-  if (result.status === "expired") await chrome.alarms.clear(PAIRING_ALARM);
+  if (result.status === "expired") {
+    await chrome.storage.local.remove("webmcpPairingSecret");
+    await chrome.alarms.clear(PAIRING_ALARM);
+  }
+}
+
+async function openSetup() {
+  const stored = await chrome.storage.local.get("webmcpPairingSecret");
+  const pairingSecret = stored.webmcpPairingSecret ?? randomSecret();
+  await chrome.storage.local.set({ webmcpPairingSecret: pairingSecret });
+  await createPairing(pairingSecret);
+  await chrome.alarms.create(PAIRING_ALARM, { periodInMinutes: 1 });
+  await chrome.tabs.create({ url: `${API_ORIGIN}/webmcp/signup?pairing_secret=${encodeURIComponent(pairingSecret)}` });
 }
 
 function randomSecret() {
@@ -222,3 +288,5 @@ function randomSecret() {
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
+
+export { buildRegistrationExpression, checkDebuggerActivity, getAttachedTabIds, getStatus };

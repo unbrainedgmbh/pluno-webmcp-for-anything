@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="165 135 925 925" role="img" aria-label="Pluno">
+  <defs>
+    <clipPath id="scribbleBoltClip">
+      <path d="M547 151 C516 151 493 169 485 199 L382 606 C373 641 396 666 431 666 L523 666 C552 666 568 684 563 713 L491 1028 C486 1054 510 1067 527 1044 L894 487 C915 455 894 432 856 432 L815 432 C784 432 773 411 789 382 L904 205 C922 171 901 145 859 145 Z"/>
+    </clipPath>
+    <filter id="scribbleBoltWobble" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="3" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="16" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g filter="url(#scribbleBoltWobble)">
+    <path d="M547 151 C516 151 493 169 485 199 L382 606 C373 641 396 666 431 666 L523 666 C552 666 568 684 563 713 L491 1028 C486 1054 510 1067 527 1044 L894 487 C915 455 894 432 856 432 L815 432 C784 432 773 411 789 382 L904 205 C922 171 901 145 859 145 Z" fill="#ffffff"/>
+    <g clip-path="url(#scribbleBoltClip)">
+      <path d="M 280 120 L 1038 150 L 262 212 L 1002 274 L 280 336 L 1038 398 L 262 460 L 1002 522 L 280 584 L 1038 646 L 262 708 L 1002 770 L 280 832 L 1038 894 L 262 956 L 1002 1018 L 280 1080 L 1038 1142" fill="none" stroke="#7c6bf2" stroke-width="56" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" transform="rotate(-14 627 600)"/>
+    </g>
+    <path d="M547 151 C516 151 493 169 485 199 L382 606 C373 641 396 666 431 666 L523 666 C552 666 568 684 563 713 L491 1028 C486 1054 510 1067 527 1044 L894 487 C915 455 894 432 856 432 L815 432 C784 432 773 411 789 382 L904 205 C922 171 901 145 859 145 Z" fill="none" stroke="#2c2a1e" stroke-width="18" stroke-linejoin="round"/>
+    <g transform="rotate(-2 528 463)">
+      <ellipse cx="528" cy="463" rx="73" ry="80" fill="#ffffff" stroke="#2c2a1e" stroke-width="13"/>
+      <ellipse cx="533" cy="473" rx="45" ry="53" fill="#2c2a1e"/>
+      <circle cx="557" cy="447" r="16" fill="#ffffff"/>
+    </g>
+    <g transform="rotate(2 717 462)">
+      <ellipse cx="717" cy="462" rx="73" ry="80" fill="#ffffff" stroke="#2c2a1e" stroke-width="13"/>
+      <ellipse cx="712" cy="473" rx="45" ry="53" fill="#2c2a1e"/>
+      <circle cx="728" cy="447" r="16" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>

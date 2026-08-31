@@ -1,0 +1,24 @@
+<svg width="1400" height="560" viewBox="0 0 1400 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="84" y1="42" x2="1320" y2="540" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#21163E" />
+      <stop offset="0.55" stop-color="#111016" />
+      <stop offset="1" stop-color="#09090B" />
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="144" y2="144" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5D50C3" />
+      <stop offset="1" stop-color="#BE5AFF" />
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="560" rx="36" fill="url(#bg)" />
+  <circle cx="1160" cy="80" r="270" fill="#7C3AED" fill-opacity="0.11" />
+  <circle cx="1270" cy="480" r="330" fill="#BE5AFF" fill-opacity="0.08" />
+  <rect x="104" y="98" width="144" height="144" rx="34" fill="url(#mark)" />
+  <g transform="translate(132 126) scale(3.666666)">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M11.0497 0.936454C11.637 0.352266 12.5868 0.354853 13.171 0.942233L23.0634 10.8888C23.6432 11.4717 23.6457 12.4126 23.0691 12.9986L13.1766 23.0521C12.5956 23.6426 11.6459 23.6502 11.0554 23.0692C10.4649 22.4881 10.4572 21.5384 11.0382 20.9479L19.8899 11.9522L11.0439 3.05777C10.4597 2.47039 10.4623 1.52064 11.0497 0.936454Z" fill="white" />
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M1.14579 1.58962C1.72679 0.999078 2.6765 0.991342 3.26704 1.57234L13.1595 11.305C13.4491 11.5899 13.6108 11.9801 13.6075 12.3864C13.6042 12.7927 13.4362 13.1803 13.142 13.4605L3.03445 23.0861C2.43454 23.6574 1.48508 23.6343 0.913767 23.0343C0.342454 22.4344 0.365639 21.485 0.965551 20.9137L9.95089 12.3567L1.16307 3.71087C0.572532 3.12987 0.564797 2.18015 1.14579 1.58962Z" fill="white" />
+  </g>
+  <text x="104" y="326" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="700">WebMCP for Anything</text>
+  <text x="104" y="386" fill="#C4B5FD" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="600">Fast, reliable browser tools for Claude/Codex in external Chrome</text>
+  <text x="104" y="452" fill="#A1A1AA" font-family="Inter, Arial, sans-serif" font-size="22">API-first · Directly callable · Improves through reviewed feedback</text>
+</svg>

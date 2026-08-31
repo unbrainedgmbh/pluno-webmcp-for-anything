@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pluno WebMCP status</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon-48.png" alt="" />
+        <div>
+          <h1>Pluno WebMCP</h1>
+          <p>External Chrome connection</p>
+        </div>
+      </header>
+      <section aria-live="polite">
+        <div class="status-row">
+          <span id="connection-dot" class="dot pending"></span>
+          <div>
+            <strong id="connection-title">Checking setup…</strong>
+            <p id="connection-detail">Please wait.</p>
+          </div>
+        </div>
+        <div class="status-row">
+          <span id="tab-dot" class="dot pending"></span>
+          <div>
+            <strong id="tab-title">Current tab</strong>
+            <p id="tab-detail">Checking activity…</p>
+          </div>
+        </div>
+      </section>
+      <button id="setup-button" type="button">Open setup</button>
+      <p class="footnote">Tools activate only while Claude/Codex controls this tab in external Chrome.</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

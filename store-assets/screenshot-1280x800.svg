@@ -1,0 +1,93 @@
+<svg width="1280" height="800" viewBox="0 0 1280 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="background" x1="60" y1="34" x2="1198" y2="768" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#21183E" />
+      <stop offset="0.5" stop-color="#0F0E14" />
+      <stop offset="1" stop-color="#09090B" />
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7C6BF2" stop-opacity="0.3" />
+      <stop offset="1" stop-color="#BE5AFF" stop-opacity="0" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity="0.42" />
+    </filter>
+  </defs>
+
+  <rect width="1280" height="800" fill="url(#background)" />
+  <circle cx="1140" cy="86" r="360" fill="url(#glow)" />
+  <circle cx="146" cy="780" r="330" fill="#7C3AED" fill-opacity="0.06" />
+
+  <g transform="translate(74 92)">
+    <image href="pa-bolt-purple-128.png" width="96" height="96" />
+    <text x="0" y="160" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="55" font-weight="750">
+      <tspan x="0" dy="0">Faster browser tools</tspan>
+      <tspan x="0" dy="66">for Claude/Codex</tspan>
+    </text>
+    <text x="0" y="330" fill="#B7B4C0" font-family="Inter, Arial, sans-serif" font-size="22">
+      <tspan x="0" dy="0">Site-specific tools activate only while your</tspan>
+      <tspan x="0" dy="34">AI agent controls external Chrome.</tspan>
+    </text>
+
+    <g transform="translate(0 430)">
+      <rect width="144" height="42" rx="21" fill="#7C6BF2" fill-opacity="0.14" stroke="#7C6BF2" stroke-opacity="0.35" />
+      <circle cx="22" cy="21" r="5" fill="#8B7CF6" />
+      <text x="38" y="27" fill="#D8D2FF" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600">API-first</text>
+      <rect x="158" width="174" height="42" rx="21" fill="#7C6BF2" fill-opacity="0.14" stroke="#7C6BF2" stroke-opacity="0.35" />
+      <circle cx="180" cy="21" r="5" fill="#8B7CF6" />
+      <text x="196" y="27" fill="#D8D2FF" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600">Directly callable</text>
+      <rect x="346" width="148" height="42" rx="21" fill="#7C6BF2" fill-opacity="0.14" stroke="#7C6BF2" stroke-opacity="0.35" />
+      <circle cx="368" cy="21" r="5" fill="#8B7CF6" />
+      <text x="384" y="27" fill="#D8D2FF" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600">Agent-ready</text>
+    </g>
+  </g>
+
+  <g transform="translate(650 54)" filter="url(#shadow)">
+    <rect width="558" height="692" rx="22" fill="#151419" stroke="#33313B" />
+    <rect width="558" height="62" rx="22" fill="#222127" />
+    <rect y="42" width="558" height="20" fill="#222127" />
+    <circle cx="25" cy="27" r="6" fill="#FF6B69" />
+    <circle cx="45" cy="27" r="6" fill="#F5C451" />
+    <circle cx="65" cy="27" r="6" fill="#61C66D" />
+    <rect x="99" y="14" width="422" height="28" rx="14" fill="#343239" />
+    <path d="M119 28a7 7 0 0 1 14 0v4h-14v-4Z" fill="#8F8B98" />
+    <rect x="121" y="24" width="10" height="9" rx="2" fill="#8F8B98" />
+    <text x="143" y="33" fill="#C9C6CF" font-family="Inter, Arial, sans-serif" font-size="13">External Chrome</text>
+
+    <g transform="translate(104 100)">
+      <rect width="350" height="530" rx="18" fill="#09090B" stroke="#34313C" />
+      <g transform="translate(22 22)">
+        <image href="pa-bolt-purple-128.png" width="44" height="44" />
+        <text x="58" y="18" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="700">Pluno WebMCP</text>
+        <text x="58" y="39" fill="#A1A1AA" font-family="Inter, Arial, sans-serif" font-size="12">Claude/Codex connection</text>
+      </g>
+
+      <g transform="translate(20 92)">
+        <rect width="310" height="86" rx="12" fill="#18181B" stroke="#2F2E35" />
+        <circle cx="22" cy="27" r="5" fill="#34D399" />
+        <text x="38" y="28" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Extension connected</text>
+        <text x="38" y="52" fill="#A1A1AA" font-family="Inter, Arial, sans-serif" font-size="12">Your Pluno account is paired.</text>
+      </g>
+
+      <g transform="translate(20 190)">
+        <rect width="310" height="86" rx="12" fill="#18181B" stroke="#2F2E35" />
+        <circle cx="22" cy="27" r="5" fill="#34D399" />
+        <text x="38" y="28" fill="#FAFAFA" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Current tab</text>
+        <text x="38" y="52" fill="#A1A1AA" font-family="Inter, Arial, sans-serif" font-size="12">12 tools ready.</text>
+      </g>
+
+      <g transform="translate(20 296)">
+        <rect width="310" height="46" rx="9" fill="#7C3AED" />
+        <text x="155" y="29" text-anchor="middle" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Reconnect or view setup</text>
+      </g>
+
+      <g transform="translate(20 370)">
+        <path d="M9 13l7 7 14-16" fill="none" stroke="#8B7CF6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        <text x="42" y="15" fill="#D4D4D8" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600">Inactive during normal browsing</text>
+        <text x="42" y="38" fill="#8C8993" font-family="Inter, Arial, sans-serif" font-size="12">Tools load only when an agent controls this tab.</text>
+      </g>
+
+      <text x="175" y="494" text-anchor="middle" fill="#71717A" font-family="Inter, Arial, sans-serif" font-size="11">Pluno WebMCP for Anything</text>
+    </g>
+  </g>
+</svg>

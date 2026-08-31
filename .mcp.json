@@ -2,9 +2,7 @@
   "mcpServers": {
     "pluno-webmcp": {
       "type": "http",
-      "url": "https://app.pluno.ai/webmcp/mcp",
-      "oauth_resource": "https://app.pluno.ai/webmcp"
+      "url": "https://app.pluno.ai/api/webmcp/mcp"
     }
   }
 }
-

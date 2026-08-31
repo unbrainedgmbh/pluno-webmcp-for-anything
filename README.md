@@ -1,10 +1,10 @@
 # Pluno WebMCP for Anything
 
-An open-source Chrome extension and Codex plugin that loads origin-specific WebMCP tools only while Codex is actively debugging the browser, then feeds privacy-safe improvement suggestions back to Pluno for review.
+A Chrome extension and Claude/Codex integration that loads origin-specific, directly callable browser tools while Claude/Codex is actively debugging external Chrome, then feeds privacy-safe improvements and general feedback back to Pluno.
 
-## Install the Codex plugin
+## Connect Claude/Codex
 
-Import this GitHub repository as a non-marketplace plugin in Codex. The plugin lives at the repository root, which is the standard Git import layout. Connect the included `pluno-webmcp` MCP server when Codex prompts for OAuth.
+Import this GitHub repository through your Claude/Codex plugin or MCP setup. The integration lives at the repository root. Connect the included `pluno-webmcp` MCP server when Claude/Codex prompts for OAuth.
 
 ## Install the Chrome extension
 
@@ -15,13 +15,18 @@ Until a Chrome Web Store package is available:
 3. Select the `extension` directory.
 4. Finish setup at `https://app.pluno.ai/webmcp/signup` when the extension opens it.
 
-Both the extension and Codex plugin must be connected before tools are injected.
+Both the extension and the Claude/Codex integration must be connected before tools are injected.
+
+Tool injection follows debugger attachment per tab, including background tabs. Switching away from the tab Claude/Codex is controlling does not prevent that tab from receiving its origin-specific tools, while unrelated tabs remain untouched.
+
+No Chrome flag is required. The extension always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically.
+
+The extension cannot run in built-in agent browsers that do not support Chrome extensions. Use Claude/Codex with external Chrome to get the injected Pluno tools; they make supported browser operations faster, more reliable, and more token-efficient than UI automation.
 
 ## Privacy and security
 
-The bearer token stays in extension storage and is never exposed to page JavaScript. Remote tool code is evaluated only with Chrome's debugger API while debugger activity is present. Improvement suggestions must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
+The bearer token stays in extension storage and is never exposed to page JavaScript. Chrome's debugger API delivers inert tool definitions; remote tool code is evaluated and cached only on the first direct invocation. Improvement suggestions and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
 
 ## License
 
 MIT
-
