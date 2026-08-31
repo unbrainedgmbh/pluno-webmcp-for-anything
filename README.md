@@ -15,7 +15,14 @@ Start Claude Code, open `/mcp`, and authenticate the included `pluno-webmcp` ser
 
 ## Connect Codex
 
-Import this GitHub repository through the Codex plugin setup. The integration lives at the repository root. Connect the included `pluno-webmcp` MCP server when Codex prompts for OAuth.
+Add the repository as a Codex marketplace and install the integration:
+
+```bash
+codex plugin marketplace add unbrainedgmbh/pluno-webmcp-for-anything
+codex plugin add pluno-webmcp-for-anything@pluno
+```
+
+Restart Codex, start a new task, and authenticate the included `pluno-webmcp` MCP server when prompted.
 
 ## Install the Chrome extension
 
