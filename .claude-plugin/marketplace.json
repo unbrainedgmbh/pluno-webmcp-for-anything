@@ -1,0 +1,17 @@
+{
+  "name": "pluno",
+  "owner": {
+    "name": "Pluno",
+    "url": "https://pluno.ai"
+  },
+  "description": "Pluno integrations for Claude Code",
+  "plugins": [
+    {
+      "name": "pluno-webmcp-for-anything",
+      "source": "./",
+      "description": "Use and improve API-first WebMCP tools in external Chrome",
+      "category": "developer-tools",
+      "tags": ["browser", "webmcp", "automation"]
+    }
+  ]
+}

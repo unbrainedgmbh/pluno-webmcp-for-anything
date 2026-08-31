@@ -2,9 +2,20 @@
 
 A Chrome extension and Claude/Codex integration that loads origin-specific, directly callable browser tools while Claude/Codex is actively debugging external Chrome, then feeds privacy-safe improvements and general feedback back to Pluno.
 
-## Connect Claude/Codex
+## Connect Claude Code
 
-Import this GitHub repository through your Claude/Codex plugin or MCP setup. The integration lives at the repository root. Connect the included `pluno-webmcp` MCP server when Claude/Codex prompts for OAuth.
+Add the repository as a Claude marketplace and install the integration:
+
+```bash
+claude plugin marketplace add unbrainedgmbh/pluno-webmcp-for-anything
+claude plugin install pluno-webmcp-for-anything@pluno --scope user
+```
+
+Start Claude Code, open `/mcp`, and authenticate the included `pluno-webmcp` server when prompted.
+
+## Connect Codex
+
+Import this GitHub repository through the Codex plugin setup. The integration lives at the repository root. Connect the included `pluno-webmcp` MCP server when Codex prompts for OAuth.
 
 ## Install the Chrome extension
 
