@@ -14,11 +14,12 @@ Use tools in this order:
 
    ```js
    const registry = globalThis.__PLUNO_WEBMCP_TOOLS__;
-   const tools = await registry.getTools();
-   const result = await registry.getTool("exact_tool_name").execute(input);
+   const tools = (await registry.getTools()).map(({ name, description }) => ({ name, description }));
+   const tool = await registry.getTool(name);
+   const result = await tool.execute(input);
    ```
 
-   `getTools()` returns discovery metadata matching `document.modelContext.getTools()`. Choose an exact name and provide input matching its `inputSchema`. `getTool()` selects the directly callable entry; only `execute()` evaluates and caches its implementation. If execution fails with `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the exact same registry call through the external-browser debugger connection already controlled by Claude/Codex, enabling `allowUnsafeEvalBlockedByCSP` when raw CDP options are available. Do not rewrite or regenerate the implementation.
+   Use the compact `tools` list to choose an exact name. Then inspect `tool.inputSchema` and its other metadata, construct matching input, and call `execute()`. Only `execute()` evaluates and caches the implementation. If execution fails with `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the exact same registry call through the external-browser debugger connection already controlled by Claude/Codex, enabling `allowUnsafeEvalBlockedByCSP` when raw CDP options are available. Do not rewrite or regenerate the implementation.
 3. If neither path is available or sufficient, complete the task with ordinary browser inspection and automation.
 
 Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in external Chrome.
