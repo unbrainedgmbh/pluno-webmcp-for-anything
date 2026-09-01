@@ -1,6 +1,6 @@
 {
   "name": "pluno-webmcp-for-anything",
-  "version": "0.1.7",
+  "version": "0.1.6",
   "description": "Use and improve API-first WebMCP tools whenever Claude/Codex works in a browser.",
   "author": {
     "name": "Pluno",

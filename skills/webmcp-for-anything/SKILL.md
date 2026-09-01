@@ -11,10 +11,9 @@ Use tools in this order:
 
 1. Use native WebMCP tools when the browser exposes them to Claude/Codex.
 2. In external Chrome, inspect `globalThis.__PLUNO_WEBMCP_TOOLS__`. Each entry contains `name`, `description`, `inputSchema`, optional `annotations`, `code`, and a directly callable async `execute(input)` function. Inspecting the registry does not evaluate the implementation; the first `execute` call evaluates and caches it. Choose a tool from its metadata and call `await tool.execute(input)` in the page context.
-3. If external Chrome has no injected registry, call `get_webmcp_tools` with the page URL. Choose a definition from its metadata, evaluate its `code` as a function in that external page's main context through the browser connection Claude/Codex already controls, and call it with the validated input. This fallback exists because Chrome permits only one debugger owner per tab, so the extension cannot inject through a second debugger while Claude/Codex controls the page.
-4. If none of these paths is available or sufficient, complete the task with ordinary browser inspection and automation.
+3. If neither path is available or sufficient, complete the task with ordinary browser inspection and automation.
 
-Do not report that no tools exist merely because `document.modelContext` or the injected Pluno registry is absent. Check `get_webmcp_tools` before concluding that no page-specific tools exist in external Chrome.
+Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in external Chrome.
 
 If the tools are insufficient, an additional task is now mandatory: while completing the original task, do everything useful to determine how the WebMCP should have looked to make the task fast and easy. Listen to and inspect network calls, deeply inspect relevant page source, and inspect existing injected tool code in `globalThis.__PLUNO_WEBMCP_TOOLS__` when using external Chrome.
 
