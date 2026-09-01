@@ -6,40 +6,39 @@ Name: Pluno WebMCP for Anything
 
 Category: Developer Tools
 
-Summary: Gives Claude/Codex fast, reliable, API-first tools while it controls external Chrome.
+Summary: Gives Claude/Codex fast, reliable, API-first tools in external Chrome.
 
 Detailed description:
 
-Pluno WebMCP for Anything connects Claude/Codex to purpose-built browser tools in external Chrome. When an AI agent attaches a debugger to a tab, the extension loads reviewed tools for that website and exposes them through native WebMCP when available and through the directly callable Pluno registry everywhere else. Debugger-attached background tabs are supported; unrelated tabs remain untouched.
+Pluno WebMCP for Anything connects Claude/Codex to purpose-built browser tools in external Chrome. The extension automatically loads reviewed tools for each supported website and exposes them through native WebMCP when available and through the directly callable Pluno registry everywhere else. Background tabs are supported, so tools are ready when an AI agent needs them.
 
-The extension stays inactive during normal browsing. It only requests and injects tools while Chrome reports that Claude/Codex has attached a debugger to that specific tab. The popup shows whether setup is complete and whether tools are active for the current tab.
+The extension sends only the current site origin—not its path, query string, or page content—to Pluno to select the matching tool catalog. The popup shows whether setup is complete and how many tools are ready for the current tab.
 
 Setup requires one Pluno sign-in, the Chrome extension, and the companion Claude/Codex integration.
 
 ## Single purpose
 
-Expose reviewed, site-specific browser tools while Claude/Codex controls the user&apos;s external Chrome tab.
+Expose reviewed, site-specific browser tools to Claude/Codex in the user&apos;s external Chrome tabs.
 
 ## Permission justifications
 
-- `debugger`: Detects which tabs Claude/Codex is actively controlling, including background tabs. The extension does not attach its own debugger or interfere with the controlling agent&apos;s connection.
-- `scripting`: Injects the selected tool catalog into Claude/Codex-controlled tabs, removes stale tools after navigation, and displays setup or connection errors without exposing the Pluno bearer token.
+- `scripting`: Injects the selected tool catalog into supported tabs, removes stale tools after navigation, and displays setup or connection errors without exposing the Pluno bearer token.
 - `storage`: Stores the extension&apos;s Pluno pairing secret and bearer token locally.
 - `tabs`: Opens onboarding, identifies the active tab for the status popup, and clears transient state when a tab closes.
 - `alarms`: Checks the short-lived pairing flow in the background until onboarding completes or expires.
-- `<all_urls>` host access: The product&apos;s single purpose is to provide origin-specific tools on any website the user asks Claude/Codex to operate. Tool activation remains gated on an attached debugger.
+- `<all_urls>` host access: The product&apos;s single purpose is to make origin-specific tools available on websites the user may ask Claude/Codex to operate. The extension sends only the site origin to select tools and never sends the page path, query string, or content during discovery.
 
 ## Remote code declaration
 
 Answer: Yes.
 
-Justification: The extension downloads reviewed, origin-specific tool definitions from Pluno and exposes them only inside the website tab after the user asks Claude/Codex to control that tab. The extension itself contains the complete activation, authentication, registry, status, and safety logic; remote definitions are never executed in the extension service worker or popup. Tool execution is initiated by Claude/Codex in the controlled website tab. On pages whose Content Security Policy blocks ordinary evaluation, Claude/Codex may repeat the same injected registry call through the debugger connection it already owns.
+Justification: The extension downloads reviewed, origin-specific tool definitions from Pluno and exposes them only inside the matching website tab. The extension itself contains the complete activation, authentication, registry, status, and safety logic; remote definitions are never executed in the extension service worker or popup. Tool execution is initiated by Claude/Codex in the website tab. On pages whose Content Security Policy blocks ordinary evaluation, Claude/Codex may repeat the same injected registry call through the browser debugger connection it already owns.
 
 ## Data disclosures
 
 Disclose these categories:
 
-- Web history: a debugger-attached tab&apos;s current page URL is sent to `https://app.pluno.ai` only while Claude/Codex controls that tab, so Pluno can select the origin-specific tool catalog.
+- Web history: the current site origin is sent to `https://app.pluno.ai` when a supported page opens so Pluno can select the origin-specific tool catalog. Paths, query strings, and page content are not included.
 - Authentication information: a narrow Pluno bearer token is stored in `chrome.storage.local` and sent only to `https://app.pluno.ai` over HTTPS.
 - Website content: invoked tools may read or modify the current website as required by the user&apos;s Claude/Codex task. That website data is returned to the local page/Claude/Codex flow and is not automatically uploaded to Pluno by the extension.
 
@@ -57,7 +56,7 @@ Terms URL: `https://pluno.ai/terms`
 4. Ask Claude/Codex to use external Chrome on a normal HTTPS page.
 5. Open the extension popup. It will show the paired account and the number of tools available for the current tab, or a clear pending/error state.
 
-Normal browsing without an attached Claude/Codex debugger causes no tool request or injection.
+Tools load automatically on supported pages; Claude/Codex does not need to attach a debugger for discovery or normal execution.
 
 ## Assets
 

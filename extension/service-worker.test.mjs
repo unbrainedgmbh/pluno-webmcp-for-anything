@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import vm from "node:vm";
 
-let debuggerTargets = [];
-let debuggerAttachCalls = 0;
 const requestedUrls = [];
 const createdTabUrls = [];
 const scriptInjections = [];
@@ -20,9 +18,10 @@ globalThis.chrome = {
     onAlarm: { addListener() {} },
   },
   runtime: {
-    getManifest: () => ({ version: "0.1.11" }),
+    getManifest: () => ({ version: "0.1.12" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
+    onStartup: { addListener() {} },
   },
   storage: {
     local: {
@@ -37,16 +36,6 @@ globalThis.chrome = {
       },
     },
   },
-  debugger: {
-    async attach() {
-      debuggerAttachCalls += 1;
-    },
-    async detach() {},
-    async getTargets() {
-      return debuggerTargets;
-    },
-    async sendCommand() {},
-  },
   scripting: {
     async executeScript(injection) {
       scriptInjections.push(injection);
@@ -58,6 +47,9 @@ globalThis.chrome = {
     },
     async get(tabId) {
       return { id: tabId, url: `https://tab-${tabId}.example/page` };
+    },
+    async query() {
+      return [];
     },
     onRemoved: { addListener() {} },
   },
@@ -74,7 +66,7 @@ globalThis.fetch = async (url) => {
   };
 };
 
-const { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, isSupportedPageUrl, openSetup } =
+const { activatePage, getStatus, installToolsInPage, isSupportedPageUrl, openSetup } =
   await import("./service-worker.js");
 
 const definition = {
@@ -194,10 +186,9 @@ test("reports when page CSP blocks lazy tool evaluation", async () => {
   );
 });
 
-test("reports paired idle status before an AI agent activates a tab", async () => {
+test("reports paired status before a supported page activates", async () => {
   assert.deepEqual(await getStatus(123), {
     paired: true,
-    active: false,
     injecting: false,
     loaded: false,
     toolCount: 0,
@@ -217,19 +208,6 @@ test("starts each setup attempt with a fresh pairing secret", async () => {
   );
 });
 
-test("finds every debugger-attached tab without including unrelated targets", () => {
-  assert.deepEqual(
-    getAttachedTabIds([
-      { attached: true, tabId: 7 },
-      { attached: false, tabId: 8 },
-      { attached: true, tabId: 9 },
-      { attached: true, tabId: 7 },
-      { attached: true, type: "worker" },
-    ]),
-    [7, 9],
-  );
-});
-
 test("skips non-web and local pages before requesting tools", async () => {
   for (const pageUrl of [
     "about:blank",
@@ -246,14 +224,12 @@ test("skips non-web and local pages before requesting tools", async () => {
   }
   assert.equal(isSupportedPageUrl("https://example.com/page"), true);
 
-  debuggerTargets = [{ attached: true, tabId: 71 }];
   const requestCount = requestedUrls.length;
 
-  assert.deepEqual(await checkDebuggerActivity(71, "about:blank"), { active: true });
+  await activatePage(71, "about:blank");
   assert.equal(requestedUrls.length, requestCount);
   assert.deepEqual(await getStatus(71), {
     paired: true,
-    active: true,
     injecting: false,
     loaded: false,
     toolCount: 0,
@@ -261,27 +237,20 @@ test("skips non-web and local pages before requesting tools", async () => {
   });
 });
 
-test("activates an attached background tab from another tab's heartbeat", async () => {
-  debuggerTargets = [{ attached: true, tabId: 9 }];
-
-  assert.deepEqual(
-    await checkDebuggerActivity(7, "https://foreground.example/page"),
-    { active: false },
-  );
+test("activates a supported background tab without a debugger", async () => {
+  await activatePage(9, "https://tab-9.example/page");
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(
     requestedUrls.at(-1),
-    "https://app.pluno.ai/api/webmcp/tools?page_url=https%3A%2F%2Ftab-9.example%2Fpage",
+    "https://app.pluno.ai/api/webmcp/tools?page_url=https%3A%2F%2Ftab-9.example",
   );
   const injection = scriptInjections.find((candidate) => candidate.args?.[0]);
   assert.equal(injection.world, "MAIN");
   assert.deepEqual(injection.target, { tabId: 9 });
   assert.equal(injection.func, installToolsInPage);
-  assert.equal(debuggerAttachCalls, 0);
   assert.deepEqual(await getStatus(9), {
     paired: true,
-    active: true,
     injecting: false,
     loaded: true,
     toolCount: 0,

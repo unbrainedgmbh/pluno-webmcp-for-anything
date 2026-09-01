@@ -33,12 +33,9 @@ async function loadStatus() {
   } else if (status.injecting) {
     setDot(tabDot, "pending");
     tabDetail.textContent = "Loading tools…";
-  } else if (status.active) {
-    setDot(tabDot, "pending");
-    tabDetail.textContent = "Claude/Codex is using this tab; waiting for tools.";
   } else {
     setDot(tabDot, "pending");
-    tabDetail.textContent = "Ready when Claude/Codex controls this tab.";
+    tabDetail.textContent = "Tools load automatically on supported web pages.";
   }
 }
 

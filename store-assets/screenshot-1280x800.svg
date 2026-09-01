@@ -25,8 +25,8 @@
       <tspan x="0" dy="66">for Claude/Codex</tspan>
     </text>
     <text x="0" y="330" fill="#B7B4C0" font-family="Inter, Arial, sans-serif" font-size="22">
-      <tspan x="0" dy="0">Site-specific tools activate only while your</tspan>
-      <tspan x="0" dy="34">AI agent controls external Chrome.</tspan>
+      <tspan x="0" dy="0">Site-specific tools load automatically and are</tspan>
+      <tspan x="0" dy="34">ready when your AI agent needs them.</tspan>
     </text>
 
     <g transform="translate(0 430)">
@@ -83,8 +83,8 @@
 
       <g transform="translate(20 370)">
         <path d="M9 13l7 7 14-16" fill="none" stroke="#8B7CF6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-        <text x="42" y="15" fill="#D4D4D8" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600">Inactive during normal browsing</text>
-        <text x="42" y="38" fill="#8C8993" font-family="Inter, Arial, sans-serif" font-size="12">Tools load only when an agent controls this tab.</text>
+        <text x="42" y="15" fill="#D4D4D8" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600">Ready automatically</text>
+        <text x="42" y="38" fill="#8C8993" font-family="Inter, Arial, sans-serif" font-size="12">Tools load whenever a supported page opens.</text>
       </g>
 
       <text x="175" y="494" text-anchor="middle" fill="#71717A" font-family="Inter, Arial, sans-serif" font-size="11">Pluno WebMCP for Anything</text>

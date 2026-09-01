@@ -6,17 +6,22 @@ const SETUP_ERROR = "Extension setup is incomplete.";
 const tabState = new Map();
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  if (reason !== "install") return;
-  await openSetup();
+  if (reason === "install") {
+    await openSetup();
+    return;
+  }
+  await activateOpenTabs();
 });
+
+chrome.runtime.onStartup.addListener(activateOpenTabs);
 
 chrome.alarms.onAlarm.addListener(async ({ name }) => {
   if (name === PAIRING_ALARM) await exchangePairing();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "WEBMCP_CHECK_DEBUGGER" && sender.tab?.id !== undefined) {
-    checkDebuggerActivity(sender.tab.id, message.pageUrl).then(sendResponse);
+  if (message?.type === "WEBMCP_ACTIVATE_PAGE" && sender.tab?.id !== undefined) {
+    activatePage(sender.tab.id, message.pageUrl).then(() => sendResponse({ activated: true }));
     return true;
   }
   if (message?.type === "WEBMCP_GET_STATUS") {
@@ -32,41 +37,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => tabState.delete(tabId));
 
-async function checkDebuggerActivity(tabId, pageUrl) {
+async function activatePage(tabId, pageUrl) {
   if (pageUrl.startsWith(`${API_ORIGIN}/webmcp/signup`)) await exchangePairing();
-  const targets = await chrome.debugger.getTargets();
-  const attachedTabIds = getAttachedTabIds(targets);
-  const attachedTabIdSet = new Set(attachedTabIds);
-  for (const [knownTabId, state] of tabState) {
-    if (!attachedTabIdSet.has(knownTabId)) {
-      tabState.set(knownTabId, { ...state, active: false });
-    }
-  }
-  await Promise.all(
-    attachedTabIds.map(async (attachedTabId) => {
-      const attachedPageUrl =
-        attachedTabId === tabId
-          ? pageUrl
-          : await chrome.tabs.get(attachedTabId).then((tab) => tab.url).catch(() => undefined);
-      if (attachedPageUrl) await activateAttachedTab(attachedTabId, attachedPageUrl);
-    }),
-  );
-  return { active: attachedTabIdSet.has(tabId) };
-}
-
-async function activateAttachedTab(tabId, pageUrl) {
   const previous = tabState.get(tabId) ?? {
-    active: false,
+    revision: 0,
     url: null,
     toolNames: [],
     loaded: false,
     injecting: false,
     lastError: null,
   };
+  const revision = previous.revision + 1;
   if (!isSupportedPageUrl(pageUrl)) {
     tabState.set(tabId, {
       ...previous,
-      active: true,
+      revision,
       url: pageUrl,
       toolNames: [],
       loaded: false,
@@ -75,18 +60,15 @@ async function activateAttachedTab(tabId, pageUrl) {
     });
     return;
   }
-  tabState.set(tabId, { ...previous, active: true, url: pageUrl });
+  tabState.set(tabId, { ...previous, revision, url: pageUrl, injecting: true, lastError: null });
 
-  if (
-    !previous.injecting &&
-    (previous.url !== pageUrl || !previous.loaded)
-  ) {
-    activateTab(tabId, pageUrl, previous.url !== pageUrl ? previous.toolNames : []).catch(async () => {
+  activateTab(tabId, pageUrl, previous.url !== pageUrl ? previous.toolNames : [], revision).catch(async () => {
+    if (tabState.get(tabId)?.revision === revision) {
       const current = tabState.get(tabId) ?? previous;
       tabState.set(tabId, { ...current, injecting: false, loaded: false, lastError: "Tool injection failed." });
       await logPageError(tabId, "Pluno WebMCP could not inject tools.");
-    });
-  }
+    }
+  });
 }
 
 function isSupportedPageUrl(pageUrl) {
@@ -102,38 +84,30 @@ function isLocalHostname(hostname) {
   return hostname === "::1" || /^::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}$/.test(hostname);
 }
 
-function getAttachedTabIds(targets) {
-  return [
-    ...new Set(
-      targets
-        .filter((target) => target.attached && target.tabId !== undefined)
-        .map((target) => target.tabId),
-    ),
-  ];
-}
-
-async function activateTab(tabId, pageUrl, staleToolNames) {
-  const initial = tabState.get(tabId) ?? { active: true, url: pageUrl, toolNames: [] };
-  tabState.set(tabId, { ...initial, injecting: true, lastError: null });
+async function activateTab(tabId, pageUrl, staleToolNames, revision) {
   if (staleToolNames.length) await unregisterTools(tabId, staleToolNames);
+  if (tabState.get(tabId)?.revision !== revision) return;
   const { webmcpToken } = await chrome.storage.local.get("webmcpToken");
+  if (tabState.get(tabId)?.revision !== revision) return;
   if (!webmcpToken) {
     await logSetupError(tabId);
-    tabState.set(tabId, { ...initial, injecting: false, loaded: false, lastError: SETUP_ERROR });
+    updateCurrentTabState(tabId, revision, { injecting: false, loaded: false, lastError: SETUP_ERROR });
     return;
   }
-  const response = await fetch(`${API_ORIGIN}/api/webmcp/tools?page_url=${encodeURIComponent(pageUrl)}`, {
+  // Tool catalogs are origin-specific, so paths and query strings never need to leave the browser.
+  const pageOrigin = new URL(pageUrl).origin;
+  const response = await fetch(`${API_ORIGIN}/api/webmcp/tools?page_url=${encodeURIComponent(pageOrigin)}`, {
     headers: { Authorization: `Bearer ${webmcpToken}` },
   });
+  if (tabState.get(tabId)?.revision !== revision) return;
   if (response.status === 403) {
     await logPluginError(tabId);
-    tabState.set(tabId, { ...initial, injecting: false, loaded: false, lastError: PLUGIN_ERROR });
+    updateCurrentTabState(tabId, revision, { injecting: false, loaded: false, lastError: PLUGIN_ERROR });
     return;
   }
   if (!response.ok) {
     await logPageError(tabId, `Pluno WebMCP could not load tools (${response.status}).`);
-    tabState.set(tabId, {
-      ...initial,
+    updateCurrentTabState(tabId, revision, {
       injecting: false,
       loaded: false,
       lastError: `Could not load tools (${response.status}).`,
@@ -141,10 +115,9 @@ async function activateTab(tabId, pageUrl, staleToolNames) {
     return;
   }
   const { tools } = await response.json();
+  if (tabState.get(tabId)?.revision !== revision) return;
   const injected = await injectThroughScripting(tabId, tools);
-  const current = tabState.get(tabId) ?? { active: true, url: pageUrl };
-  tabState.set(tabId, {
-    ...current,
+  updateCurrentTabState(tabId, revision, {
     injecting: false,
     toolNames: injected ? tools.map((tool) => tool.name) : [],
     loaded: injected,
@@ -152,12 +125,28 @@ async function activateTab(tabId, pageUrl, staleToolNames) {
   });
 }
 
+function updateCurrentTabState(tabId, revision, updates) {
+  const current = tabState.get(tabId);
+  if (current?.revision !== revision) return;
+  tabState.set(tabId, { ...current, ...updates });
+}
+
+async function activateOpenTabs() {
+  const { webmcpToken } = await chrome.storage.local.get("webmcpToken");
+  if (!webmcpToken) return;
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(
+    tabs.map(async (tab) => {
+      if (tab.id !== undefined && tab.url) await activatePage(tab.id, tab.url);
+    }),
+  );
+}
+
 async function getStatus(tabId) {
   const { webmcpToken } = await chrome.storage.local.get("webmcpToken");
   const state = typeof tabId === "number" ? tabState.get(tabId) : undefined;
   return {
     paired: Boolean(webmcpToken),
-    active: state?.active ?? false,
     injecting: state?.injecting ?? false,
     loaded: state?.loaded ?? false,
     toolCount: state?.toolNames?.length ?? 0,
@@ -319,6 +308,7 @@ async function exchangePairing() {
     await chrome.storage.local.set({ webmcpToken: result.token });
     await chrome.storage.local.remove("webmcpPairingSecret");
     await chrome.alarms.clear(PAIRING_ALARM);
+    await activateOpenTabs();
   }
   if (result.status === "expired") {
     await chrome.storage.local.remove("webmcpPairingSecret");
@@ -341,4 +331,4 @@ function randomSecret() {
   return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-export { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, isSupportedPageUrl, openSetup };
+export { activateOpenTabs, activatePage, getStatus, installToolsInPage, isSupportedPageUrl, openSetup };

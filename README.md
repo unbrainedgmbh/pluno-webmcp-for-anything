@@ -1,6 +1,6 @@
 # Pluno WebMCP for Anything
 
-A Chrome extension and Claude/Codex integration that loads origin-specific, directly callable browser tools while Claude/Codex is actively debugging external Chrome, then feeds privacy-safe improvements and general feedback back to Pluno.
+A Chrome extension and Claude/Codex integration that automatically loads origin-specific, directly callable browser tools in external Chrome, then feeds privacy-safe improvements and general feedback back to Pluno.
 
 ## Connect Claude Code
 
@@ -35,15 +35,15 @@ Until a Chrome Web Store package is available:
 
 Both the extension and the Claude/Codex integration must be connected before tools are injected.
 
-Tool injection follows debugger attachment per tab, including background tabs. Switching away from the tab Claude/Codex is controlling does not prevent that tab from receiving its origin-specific tools, while unrelated tabs remain untouched.
+The extension injects origin-specific tools automatically on every supported page, including background tabs. Injection does not depend on Claude/Codex controlling the tab or attaching a debugger.
 
-No Chrome flag is required. The extension uses debugger state only to identify Claude/Codex-controlled tabs, then injects without competing for the existing debugger connection. It always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`; the array provides `await globalThis.__PLUNO_WEBMCP_TOOLS__.getTools()` with the native discovery shape and `globalThis.__PLUNO_WEBMCP_TOOLS__.getTool(name)` for exact-name selection. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically. If strict page CSP blocks normal execution, Claude/Codex repeats the same registry call through its debugger rather than rewriting the implementation.
+It always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`; the array provides `await globalThis.__PLUNO_WEBMCP_TOOLS__.getTools()` with the native discovery shape and `globalThis.__PLUNO_WEBMCP_TOOLS__.getTool(name)` for exact-name selection. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically. If strict page CSP blocks normal execution, Claude/Codex repeats the same registry call through its own browser debugger connection rather than rewriting the implementation.
 
 The extension cannot run in built-in agent browsers that do not support Chrome extensions. Use Claude/Codex with external Chrome to get the injected Pluno tools; they make supported browser operations faster, more reliable, and more token-efficient than UI automation.
 
 ## Privacy and security
 
-The bearer token stays in extension storage and is never exposed to page JavaScript. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Improvement suggestions and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
+The bearer token stays in extension storage and is never exposed to page JavaScript. To select an origin-specific catalog, the extension sends only the current site origin—never its path, query string, or page content—to Pluno. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Improvement suggestions and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
 
 ## License
 
