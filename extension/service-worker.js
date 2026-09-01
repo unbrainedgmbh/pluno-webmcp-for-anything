@@ -92,13 +92,14 @@ async function activateAttachedTab(tabId, pageUrl) {
 function isSupportedPageUrl(pageUrl) {
   if (!URL.canParse(pageUrl)) return false;
   const parsed = new URL(pageUrl);
-  const hostname = parsed.hostname.toLowerCase();
-  return (
-    ["http:", "https:"].includes(parsed.protocol) &&
-    hostname !== "localhost" &&
-    !hostname.endsWith(".localhost") &&
-    !["127.0.0.1", "[::1]"].includes(hostname)
-  );
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.+$/, "");
+  return ["http:", "https:"].includes(parsed.protocol) && !isLocalHostname(hostname);
+}
+
+function isLocalHostname(hostname) {
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+  if (/^127(?:\.\d{1,3}){3}$/.test(hostname)) return true;
+  return hostname === "::1" || /^::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}$/.test(hostname);
 }
 
 function getAttachedTabIds(targets) {

@@ -235,9 +235,12 @@ test("skips non-web and local pages before requesting tools", async () => {
     "about:blank",
     "chrome://extensions",
     "http://localhost:3000/page",
+    "http://localhost.:3000/page",
     "https://app.localhost/page",
     "http://127.0.0.1:8080/page",
+    "http://127.0.0.2:8080/page",
     "http://[::1]:8080/page",
+    "http://[::ffff:127.0.0.1]:8080/page",
   ]) {
     assert.equal(isSupportedPageUrl(pageUrl), false);
   }
