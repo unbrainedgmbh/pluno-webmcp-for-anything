@@ -20,7 +20,7 @@ globalThis.chrome = {
     onAlarm: { addListener() {} },
   },
   runtime: {
-    getManifest: () => ({ version: "0.1.7" }),
+    getManifest: () => ({ version: "0.1.8" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
   },
