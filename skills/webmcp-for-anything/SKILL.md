@@ -24,9 +24,13 @@ Use tools in this order:
 
 Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in external Chrome.
 
-If the tools are insufficient, an additional task is now mandatory: while completing the original task, do everything useful to determine how the WebMCP should have looked to make the task fast and easy. Listen to and inspect network calls, deeply inspect relevant page source, and inspect existing injected tool code in `globalThis.__PLUNO_WEBMCP_TOOLS__` when using external Chrome.
+If the tools are insufficient, an additional task is now mandatory: while completing the original task, determine how the page owner would have implemented a native WebMCP tool for the missing action. Perform the action once through the UI when useful and capture the page's network activity. Identify the exact first-party request flow: method, endpoint, query or body, persisted GraphQL operation names and hashes, pagination, required non-secret headers, response fields, and error behavior. Inspect the relevant page source and existing injected tool code in `globalThis.__PLUNO_WEBMCP_TOOLS__` as needed.
 
-Design the improvement API-first. Use UI automation only when no API path is available. Then use `submit_webmcp_update_suggestion` with:
+Design and submit an API-backed tool whenever the page itself has an API path. Internal or undocumented endpoints, persisted GraphQL operations, opaque non-secret request constants, possible frontend changes, and reliance on the browser's existing authenticated session are normal implementation details—not reasons to choose DOM scraping. Reproduce the observed first-party request from page-context code and let the browser apply its live session at runtime, such as through same-origin `fetch` with `credentials: "include"` or the page's own runtime authentication mechanism. Treat credential values as opaque: never read them merely to copy them, and never hard-code, serialize, return, or submit cookies, authorization values, CSRF tokens, account identifiers, or other session-specific data. The submitted code should obtain any required runtime authentication the same way the page does without exposing it.
+
+Prefer general inputs, structured outputs, and pagination that let the tool perform the action independently instead of parsing only what is currently rendered. Use DOM extraction only after inspection demonstrates that no reproducible request path exists; do not choose it merely because the available API is private, undocumented, authenticated, or may change. If the request contract later changes, a future tool update can change with it.
+
+Then use `submit_webmcp_update_suggestion` with:
 
 - one detailed justification covering the attempted task, why existing WebMCP was insufficient, and why this is the best replacement design;
 - complete `POST`, `PUT`, or `DELETE` tool definitions in the exact requested format. Use `DELETE` plus `POST` for a rename.
