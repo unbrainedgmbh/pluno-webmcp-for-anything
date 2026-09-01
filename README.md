@@ -37,7 +37,7 @@ Both the extension and the Claude/Codex integration must be connected before too
 
 Tool injection follows debugger attachment per tab, including background tabs. Switching away from the tab Claude/Codex is controlling does not prevent that tab from receiving its origin-specific tools, while unrelated tabs remain untouched.
 
-No Chrome flag is required. The extension uses debugger state only to identify Claude/Codex-controlled tabs, then injects without competing for the existing debugger connection. It always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically. If strict page CSP blocks normal execution, Claude/Codex repeats the same registry call through its debugger rather than rewriting the implementation.
+No Chrome flag is required. The extension uses debugger state only to identify Claude/Codex-controlled tabs, then injects without competing for the existing debugger connection. It always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`; the array also provides `await globalThis.__PLUNO_WEBMCP_TOOLS__.getTools()` with the native discovery shape. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically. If strict page CSP blocks normal execution, Claude/Codex repeats the same registry call through its debugger rather than rewriting the implementation.
 
 The extension cannot run in built-in agent browsers that do not support Chrome extensions. Use Claude/Codex with external Chrome to get the injected Pluno tools; they make supported browser operations faster, more reliable, and more token-efficient than UI automation.
 

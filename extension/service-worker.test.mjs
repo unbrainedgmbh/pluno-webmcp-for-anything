@@ -20,7 +20,7 @@ globalThis.chrome = {
     onAlarm: { addListener() {} },
   },
   runtime: {
-    getManifest: () => ({ version: "0.1.8" }),
+    getManifest: () => ({ version: "0.1.9" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
   },
@@ -121,6 +121,45 @@ test("registers the same callable tool when native WebMCP exists", async () => {
   assert.equal(registrations.length, 1);
   assert.equal(registrations[0].execute, tools[0].execute);
   assert.equal((await registrations[0].execute({ title: "Native" })).title, "Native");
+});
+
+test("mirrors native getTools discovery on the fallback registry", async () => {
+  const context = vm.createContext({
+    document: {},
+    location: { origin: "https://example.com" },
+  });
+  const secondDefinition = {
+    ...definition,
+    name: "archive_title",
+    annotations: { readOnlyHint: false },
+  };
+  vm.runInContext(
+    `(${installToolsInPage.toString()})(${JSON.stringify([definition, secondDefinition])})`,
+    context,
+  );
+
+  const registry = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
+  const tools = await registry.getTools();
+
+  assert.equal(typeof registry.getTools, "function");
+  assert.deepEqual(Object.keys(registry), ["0", "1"]);
+  assert.deepEqual(Array.from(tools, (tool) => tool.name), ["archive_title", "get_title"]);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify({
+      ...tools[0],
+      window: undefined,
+    })),
+    {
+      name: "archive_title",
+      title: "",
+      description: "Return the current title",
+      inputSchema: { type: "object", properties: {} },
+      origin: "https://example.com",
+      annotations: { readOnlyHint: false },
+    },
+  );
+  assert.equal(tools[0].window, vm.runInContext("globalThis", context));
+  assert.equal("execute" in tools[0], false);
 });
 
 test("reports when page CSP blocks lazy tool evaluation", async () => {

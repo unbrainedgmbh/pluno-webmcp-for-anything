@@ -183,6 +183,25 @@ function installToolsInPage(definitions) {
       },
     });
   });
+  Object.defineProperty(callableTools, "getTools", {
+    value: async (_options = {}) => callableTools
+      .map((definition) => {
+        const registeredTool = {
+          name: definition.name,
+          title: definition.title ?? "",
+          description: definition.description,
+          inputSchema: definition.inputSchema,
+          origin: location.origin,
+          window: globalThis,
+        };
+        if (definition.annotations) registeredTool.annotations = definition.annotations;
+        return registeredTool;
+      })
+      .sort((first, second) => first.name.localeCompare(second.name)),
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  });
   Object.defineProperty(globalThis, "__PLUNO_WEBMCP_TOOLS__", {
     value: Object.freeze(callableTools),
     configurable: true,
