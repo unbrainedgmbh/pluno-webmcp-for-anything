@@ -183,6 +183,16 @@ function installToolsInPage(definitions) {
       },
     });
   });
+  Object.defineProperty(callableTools, "getTool", {
+    value: (name) => {
+      const tool = callableTools.find((definition) => definition.name === name);
+      if (!tool) throw new Error("Unknown Pluno WebMCP tool: " + name);
+      return tool;
+    },
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  });
   Object.defineProperty(callableTools, "getTools", {
     value: async (_options = {}) => callableTools
       .map((definition) => {

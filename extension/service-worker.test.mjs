@@ -20,7 +20,7 @@ globalThis.chrome = {
     onAlarm: { addListener() {} },
   },
   runtime: {
-    getManifest: () => ({ version: "0.1.9" }),
+    getManifest: () => ({ version: "0.1.10" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
   },
@@ -160,6 +160,18 @@ test("mirrors native getTools discovery on the fallback registry", async () => {
   );
   assert.equal(tools[0].window, vm.runInContext("globalThis", context));
   assert.equal("execute" in tools[0], false);
+});
+
+test("selects a directly callable fallback tool by name", async () => {
+  const context = vm.createContext({ document: {} });
+  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+
+  const registry = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
+
+  assert.equal(typeof registry.getTool, "function");
+  assert.equal(registry.getTool("get_title"), registry[0]);
+  assert.equal((await registry.getTool("get_title").execute({ title: "Named" })).title, "Named");
+  assert.throws(() => registry.getTool("missing"), /Unknown Pluno WebMCP tool: missing/);
 });
 
 test("reports when page CSP blocks lazy tool evaluation", async () => {
