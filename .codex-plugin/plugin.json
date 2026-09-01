@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "Pluno WebMCP for Anything",
     "shortDescription": "Use and improve browser WebMCP tools",
-    "longDescription": "Use callable API-first tools injected into external Chrome, submit reviewed tool improvements, and send privacy-safe feedback.",
+    "longDescription": "Use callable API-first tools injected into external Chrome, submit tool improvements, and send privacy-safe feedback.",
     "developerName": "Pluno",
     "category": "Developer Tools",
     "capabilities": ["Write"],
