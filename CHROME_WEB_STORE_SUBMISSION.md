@@ -22,8 +22,8 @@ Expose reviewed, site-specific browser tools while Claude/Codex controls the use
 
 ## Permission justifications
 
-- `debugger`: Detects when Claude/Codex is actively controlling a tab and uses Chrome&apos;s documented Debugger API to deliver the selected tool catalog into that tab, including when it is in the background. The extension detaches immediately after delivery.
-- `scripting`: Removes stale tools after navigation and displays setup or connection errors in the affected page without exposing the Pluno bearer token.
+- `debugger`: Detects which tabs Claude/Codex is actively controlling, including background tabs. The extension does not attach its own debugger or interfere with the controlling agent&apos;s connection.
+- `scripting`: Injects the selected tool catalog into Claude/Codex-controlled tabs, removes stale tools after navigation, and displays setup or connection errors without exposing the Pluno bearer token.
 - `storage`: Stores the extension&apos;s Pluno pairing secret and bearer token locally.
 - `tabs`: Opens onboarding, identifies the active tab for the status popup, and clears transient state when a tab closes.
 - `alarms`: Checks the short-lived pairing flow in the background until onboarding completes or expires.
@@ -33,7 +33,7 @@ Expose reviewed, site-specific browser tools while Claude/Codex controls the use
 
 Answer: Yes.
 
-Justification: The extension downloads reviewed, origin-specific tool definitions from Pluno and executes their JavaScript only inside the website tab after the user asks Claude/Codex to control that tab. Delivery and execution use Chrome&apos;s Debugger API, which the Manifest V3 remote-code policy explicitly permits for logic covered by that API. The extension itself contains the complete activation, authentication, status, and safety logic; remote definitions are never executed in the extension service worker or popup.
+Justification: The extension downloads reviewed, origin-specific tool definitions from Pluno and exposes them only inside the website tab after the user asks Claude/Codex to control that tab. The extension itself contains the complete activation, authentication, registry, status, and safety logic; remote definitions are never executed in the extension service worker or popup. Tool execution is initiated by Claude/Codex in the controlled website tab. On pages whose Content Security Policy blocks ordinary evaluation, Claude/Codex may repeat the same injected registry call through the debugger connection it already owns.
 
 ## Data disclosures
 

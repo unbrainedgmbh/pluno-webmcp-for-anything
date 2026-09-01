@@ -1,8 +1,5 @@
 const API_ORIGIN = "https://app.pluno.ai";
 const PAIRING_ALARM = "webmcp-pairing";
-const DEBUGGER_PROTOCOL_VERSION = "1.3";
-const INJECTION_RETRY_MS = 250;
-const INJECTION_RETRY_LIMIT = 40;
 const PLUGIN_ERROR =
   "The Pluno WebMCP for Anything integration is not connected in Claude/Codex.";
 const SETUP_ERROR = "Extension setup is incomplete.";
@@ -119,14 +116,14 @@ async function activateTab(tabId, pageUrl, staleToolNames) {
     return;
   }
   const { tools } = await response.json();
-  const injected = await injectThroughDebugger(tabId, tools);
+  const injected = await injectThroughScripting(tabId, tools);
   const current = tabState.get(tabId) ?? { active: true, url: pageUrl };
   tabState.set(tabId, {
     ...current,
     injecting: false,
     toolNames: injected ? tools.map((tool) => tool.name) : [],
     loaded: injected,
-    lastError: injected ? null : "Tool injection failed while the browser debugger was busy.",
+    lastError: injected ? null : "Tool injection failed.",
   });
 }
 
@@ -143,62 +140,66 @@ async function getStatus(tabId) {
   };
 }
 
-async function injectThroughDebugger(tabId, tools) {
-  const target = { tabId };
-  for (let attempt = 0; attempt < INJECTION_RETRY_LIMIT; attempt += 1) {
-    const attached = await chrome.debugger.attach(target, DEBUGGER_PROTOCOL_VERSION).then(() => true).catch(() => false);
-    if (attached) {
-      const expression = buildRegistrationExpression(tools);
-      await chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-        expression,
-        awaitPromise: true,
-        returnByValue: true,
-      });
-      await chrome.debugger.detach(target);
-      return true;
-    }
-    await delay(INJECTION_RETRY_MS);
-  }
-  await logPageError(tabId, "Pluno WebMCP could not inject tools while the browser debugger was busy.");
-  return false;
+async function injectThroughScripting(tabId, tools) {
+  return await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: installToolsInPage,
+    args: [tools],
+  }).then(() => true).catch(async () => {
+    await logPageError(tabId, "Pluno WebMCP could not inject tools.");
+    return false;
+  });
 }
 
-function buildRegistrationExpression(tools) {
-  const serialized = JSON.stringify(tools);
-  return `(() => {
-    const definitions = ${serialized};
-    // External Chrome remains useful before native WebMCP is enabled because the agent can call this registry through code.
-    const callableTools = definitions.map((definition) => {
-      let implementation;
-      return Object.freeze({
-        ...definition,
-        execute: async (input) => {
-          implementation ??= (0, eval)("(" + definition.code + ")");
-          if (typeof implementation !== "function") {
-            throw new TypeError("Pluno WebMCP tool " + definition.name + " did not evaluate to a function.");
+function installToolsInPage(definitions) {
+  // External Chrome remains useful before native WebMCP is enabled because the agent can call this registry through code.
+  const callableTools = definitions.map((definition) => {
+    let implementation;
+    return Object.freeze({
+      ...definition,
+      execute: async (input) => {
+        if (!implementation) {
+          try {
+            implementation = (0, eval)("(" + definition.code + ")");
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (error?.name === "EvalError" || /Content Security Policy|unsafe-eval|TrustedScript/i.test(message)) {
+              const blockedError = new Error(
+                "The page blocked WebMCP code evaluation. Repeat this exact registry call through the existing browser debugger connection.",
+              );
+              blockedError.name = "PlunoWebMCPPageExecutionBlockedError";
+              blockedError.code = "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED";
+              blockedError.toolName = definition.name;
+              throw blockedError;
+            }
+            throw error;
           }
-          return implementation(input);
         }
-      });
+        if (typeof implementation !== "function") {
+          throw new TypeError("Pluno WebMCP tool " + definition.name + " did not evaluate to a function.");
+        }
+        return implementation(input);
+      },
     });
-    Object.defineProperty(globalThis, "__PLUNO_WEBMCP_TOOLS__", {
-      value: Object.freeze(callableTools),
-      configurable: true,
-      enumerable: false
-    });
-    if (!document.modelContext?.registerTool) return;
-    for (const definition of callableTools) {
-      document.modelContext.unregisterTool?.(definition.name);
-      const registration = {
-        name: definition.name,
-        description: definition.description,
-        inputSchema: definition.inputSchema,
-        execute: definition.execute
-      };
-      if (definition.annotations) registration.annotations = definition.annotations;
-      document.modelContext.registerTool(registration);
-    }
-  })()`;
+  });
+  Object.defineProperty(globalThis, "__PLUNO_WEBMCP_TOOLS__", {
+    value: Object.freeze(callableTools),
+    configurable: true,
+    enumerable: false,
+  });
+  if (!document.modelContext?.registerTool) return;
+  for (const definition of callableTools) {
+    document.modelContext.unregisterTool?.(definition.name);
+    const registration = {
+      name: definition.name,
+      description: definition.description,
+      inputSchema: definition.inputSchema,
+      execute: definition.execute,
+    };
+    if (definition.annotations) registration.annotations = definition.annotations;
+    document.modelContext.registerTool(registration);
+  }
 }
 
 async function unregisterTools(tabId, toolNames) {
@@ -286,8 +287,4 @@ function randomSecret() {
   return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-function delay(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-export { buildRegistrationExpression, checkDebuggerActivity, getAttachedTabIds, getStatus, openSetup };
+export { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, openSetup };

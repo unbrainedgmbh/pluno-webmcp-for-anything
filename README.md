@@ -37,13 +37,13 @@ Both the extension and the Claude/Codex integration must be connected before too
 
 Tool injection follows debugger attachment per tab, including background tabs. Switching away from the tab Claude/Codex is controlling does not prevent that tab from receiving its origin-specific tools, while unrelated tabs remain untouched.
 
-No Chrome flag is required. The extension always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically.
+No Chrome flag is required. The extension uses debugger state only to identify Claude/Codex-controlled tabs, then injects without competing for the existing debugger connection. It always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically. If strict page CSP blocks normal execution, Claude/Codex repeats the same registry call through its debugger rather than rewriting the implementation.
 
 The extension cannot run in built-in agent browsers that do not support Chrome extensions. Use Claude/Codex with external Chrome to get the injected Pluno tools; they make supported browser operations faster, more reliable, and more token-efficient than UI automation.
 
 ## Privacy and security
 
-The bearer token stays in extension storage and is never exposed to page JavaScript. Chrome's debugger API delivers inert tool definitions; remote tool code is evaluated and cached only on the first direct invocation. Improvement suggestions and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
+The bearer token stays in extension storage and is never exposed to page JavaScript. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Improvement suggestions and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
 
 ## License
 

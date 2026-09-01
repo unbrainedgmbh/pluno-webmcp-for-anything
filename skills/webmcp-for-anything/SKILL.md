@@ -10,7 +10,7 @@ The Pluno extension can inject tools only into the user's external Chrome browse
 Use tools in this order:
 
 1. Use native WebMCP tools when the browser exposes them to Claude/Codex.
-2. In external Chrome, inspect `globalThis.__PLUNO_WEBMCP_TOOLS__`. Each entry contains `name`, `description`, `inputSchema`, optional `annotations`, `code`, and a directly callable async `execute(input)` function. Inspecting the registry does not evaluate the implementation; the first `execute` call evaluates and caches it. Choose a tool from its metadata and call `await tool.execute(input)` in the page context.
+2. In external Chrome, inspect `globalThis.__PLUNO_WEBMCP_TOOLS__`. Each entry contains `name`, `description`, `inputSchema`, optional `annotations`, `code`, and a directly callable async `execute(input)` function. Inspecting the registry does not evaluate the implementation; the first `execute` call evaluates and caches it. Choose a tool from its metadata and call `await tool.execute(input)` in the page context. If that call fails with `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the exact same registry call through the external-browser debugger connection already controlled by Claude/Codex, enabling `allowUnsafeEvalBlockedByCSP` when raw CDP options are available. Select the injected tool and pass the same input; do not rewrite or regenerate its implementation.
 3. If neither path is available or sufficient, complete the task with ordinary browser inspection and automation.
 
 Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in external Chrome.

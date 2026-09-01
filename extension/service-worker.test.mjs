@@ -3,8 +3,10 @@ import test from "node:test";
 import vm from "node:vm";
 
 let debuggerTargets = [];
+let debuggerAttachCalls = 0;
 const requestedUrls = [];
 const createdTabUrls = [];
+const scriptInjections = [];
 const storedValues = {
   webmcpPairingSecret: "stale-pairing-secret",
   webmcpToken: "token",
@@ -18,7 +20,7 @@ globalThis.chrome = {
     onAlarm: { addListener() {} },
   },
   runtime: {
-    getManifest: () => ({ version: "0.1.6" }),
+    getManifest: () => ({ version: "0.1.7" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
   },
@@ -36,14 +38,20 @@ globalThis.chrome = {
     },
   },
   debugger: {
-    async attach() {},
+    async attach() {
+      debuggerAttachCalls += 1;
+    },
     async detach() {},
     async getTargets() {
       return debuggerTargets;
     },
     async sendCommand() {},
   },
-  scripting: { async executeScript() {} },
+  scripting: {
+    async executeScript(injection) {
+      scriptInjections.push(injection);
+    },
+  },
   tabs: {
     async create({ url }) {
       createdTabUrls.push(url);
@@ -66,7 +74,7 @@ globalThis.fetch = async (url) => {
   };
 };
 
-const { buildRegistrationExpression, checkDebuggerActivity, getAttachedTabIds, getStatus, openSetup } =
+const { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, openSetup } =
   await import("./service-worker.js");
 
 const definition = {
@@ -82,7 +90,7 @@ test("exposes directly callable tools without native WebMCP", async () => {
     code: "(() => { globalThis.evaluationCount += 1; return async (input) => ({ title: input.title }); })()",
   };
   const context = vm.createContext({ document: {}, evaluationCount: 0 });
-  vm.runInContext(buildRegistrationExpression([lazyDefinition]), context);
+  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([lazyDefinition])})`, context);
 
   const tools = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
   assert.equal(tools.length, 1);
@@ -107,12 +115,32 @@ test("registers the same callable tool when native WebMCP exists", async () => {
       },
     },
   });
-  vm.runInContext(buildRegistrationExpression([definition]), context);
+  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
 
   const tools = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
   assert.equal(registrations.length, 1);
   assert.equal(registrations[0].execute, tools[0].execute);
   assert.equal((await registrations[0].execute({ title: "Native" })).title, "Native");
+});
+
+test("reports when page CSP blocks lazy tool evaluation", async () => {
+  const context = vm.createContext({
+    document: {},
+    eval() {
+      const error = new Error("Refused to evaluate because 'unsafe-eval' violates Content Security Policy");
+      error.name = "EvalError";
+      throw error;
+    },
+  });
+  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+
+  const tool = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__[0]", context);
+  await assert.rejects(
+    tool.execute({ title: "Blocked" }),
+    (error) =>
+      error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED" &&
+      error.toolName === "get_title",
+  );
 });
 
 test("reports paired idle status before an AI agent activates a tab", async () => {
@@ -164,6 +192,11 @@ test("activates an attached background tab from another tab's heartbeat", async 
     requestedUrls.at(-1),
     "https://app.pluno.ai/api/webmcp/tools?page_url=https%3A%2F%2Ftab-9.example%2Fpage",
   );
+  const injection = scriptInjections.find((candidate) => candidate.args?.[0]);
+  assert.equal(injection.world, "MAIN");
+  assert.deepEqual(injection.target, { tabId: 9 });
+  assert.equal(injection.func, installToolsInPage);
+  assert.equal(debuggerAttachCalls, 0);
   assert.deepEqual(await getStatus(9), {
     paired: true,
     active: true,
