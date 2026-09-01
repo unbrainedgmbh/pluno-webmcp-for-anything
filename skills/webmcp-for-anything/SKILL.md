@@ -10,7 +10,15 @@ The Pluno extension can inject tools only into the user's external Chrome browse
 Use tools in this order:
 
 1. Use native WebMCP tools when the browser exposes them to Claude/Codex.
-2. In external Chrome, inspect `globalThis.__PLUNO_WEBMCP_TOOLS__`. It is an array whose asynchronous `getTools()` method returns the same discovery metadata shape as `document.modelContext.getTools()`. Select an exact tool name and call `await globalThis.__PLUNO_WEBMCP_TOOLS__.getTool(name).execute(input)` in the page context. Each array entry additionally contains `code` and the same directly callable async `execute(input)` function. Inspecting either form does not evaluate the implementation; the first `execute` call evaluates and caches it. If execution fails with `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the exact same registry call through the external-browser debugger connection already controlled by Claude/Codex, enabling `allowUnsafeEvalBlockedByCSP` when raw CDP options are available. Select the injected tool and pass the same input; do not rewrite or regenerate its implementation.
+2. In external Chrome, use the fallback registry in the page context:
+
+   ```js
+   const registry = globalThis.__PLUNO_WEBMCP_TOOLS__;
+   const tools = await registry.getTools();
+   const result = await registry.getTool("exact_tool_name").execute(input);
+   ```
+
+   `getTools()` returns discovery metadata matching `document.modelContext.getTools()`. Choose an exact name and provide input matching its `inputSchema`. `getTool()` selects the directly callable entry; only `execute()` evaluates and caches its implementation. If execution fails with `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the exact same registry call through the external-browser debugger connection already controlled by Claude/Codex, enabling `allowUnsafeEvalBlockedByCSP` when raw CDP options are available. Do not rewrite or regenerate the implementation.
 3. If neither path is available or sufficient, complete the task with ordinary browser inspection and automation.
 
 Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in external Chrome.
