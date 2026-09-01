@@ -22,7 +22,7 @@ codex plugin marketplace add unbrainedgmbh/pluno-webmcp-for-anything
 codex plugin add pluno-webmcp-for-anything@pluno
 ```
 
-Restart Codex, start a new task, and authenticate the included `pluno-webmcp` MCP server when prompted.
+Start a new Codex task and authenticate the included `pluno-webmcp` MCP server when prompted.
 
 ## Install the Chrome extension
 
