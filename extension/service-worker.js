@@ -63,6 +63,18 @@ async function activateAttachedTab(tabId, pageUrl) {
     injecting: false,
     lastError: null,
   };
+  if (!isSupportedPageUrl(pageUrl)) {
+    tabState.set(tabId, {
+      ...previous,
+      active: true,
+      url: pageUrl,
+      toolNames: [],
+      loaded: false,
+      injecting: false,
+      lastError: null,
+    });
+    return;
+  }
   tabState.set(tabId, { ...previous, active: true, url: pageUrl });
 
   if (
@@ -75,6 +87,18 @@ async function activateAttachedTab(tabId, pageUrl) {
       await logPageError(tabId, "Pluno WebMCP could not inject tools.");
     });
   }
+}
+
+function isSupportedPageUrl(pageUrl) {
+  if (!URL.canParse(pageUrl)) return false;
+  const parsed = new URL(pageUrl);
+  const hostname = parsed.hostname.toLowerCase();
+  return (
+    ["http:", "https:"].includes(parsed.protocol) &&
+    hostname !== "localhost" &&
+    !hostname.endsWith(".localhost") &&
+    !["127.0.0.1", "[::1]"].includes(hostname)
+  );
 }
 
 function getAttachedTabIds(targets) {
@@ -316,4 +340,4 @@ function randomSecret() {
   return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-export { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, openSetup };
+export { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, isSupportedPageUrl, openSetup };

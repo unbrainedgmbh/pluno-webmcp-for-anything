@@ -20,7 +20,7 @@ globalThis.chrome = {
     onAlarm: { addListener() {} },
   },
   runtime: {
-    getManifest: () => ({ version: "0.1.10" }),
+    getManifest: () => ({ version: "0.1.11" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
   },
@@ -74,7 +74,7 @@ globalThis.fetch = async (url) => {
   };
 };
 
-const { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, openSetup } =
+const { checkDebuggerActivity, getAttachedTabIds, getStatus, installToolsInPage, isSupportedPageUrl, openSetup } =
   await import("./service-worker.js");
 
 const definition = {
@@ -228,6 +228,34 @@ test("finds every debugger-attached tab without including unrelated targets", ()
     ]),
     [7, 9],
   );
+});
+
+test("skips non-web and local pages before requesting tools", async () => {
+  for (const pageUrl of [
+    "about:blank",
+    "chrome://extensions",
+    "http://localhost:3000/page",
+    "https://app.localhost/page",
+    "http://127.0.0.1:8080/page",
+    "http://[::1]:8080/page",
+  ]) {
+    assert.equal(isSupportedPageUrl(pageUrl), false);
+  }
+  assert.equal(isSupportedPageUrl("https://example.com/page"), true);
+
+  debuggerTargets = [{ attached: true, tabId: 71 }];
+  const requestCount = requestedUrls.length;
+
+  assert.deepEqual(await checkDebuggerActivity(71, "about:blank"), { active: true });
+  assert.equal(requestedUrls.length, requestCount);
+  assert.deepEqual(await getStatus(71), {
+    paired: true,
+    active: true,
+    injecting: false,
+    loaded: false,
+    toolCount: 0,
+    lastError: null,
+  });
 });
 
 test("activates an attached background tab from another tab's heartbeat", async () => {
