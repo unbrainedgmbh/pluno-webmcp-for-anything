@@ -1,39 +1,71 @@
 ---
 name: webmcp-for-anything
-description: Use whenever doing anything in a browser. Prefer the callable tools injected into external Chrome and build reusable WebMCP tools when they are insufficient.
+description: Use whenever doing anything in a browser. Complete tasks through available WebMCP tools and build missing tools for next time.
 ---
 
 # WebMCP for Anything
 
-The Pluno extension can inject tools only into the user's external Chrome browser. Built-in agent browsers that do not support extensions cannot expose `globalThis.__PLUNO_WEBMCP_TOOLS__`. When the task can use external Chrome, prefer it because the injected tools make browser operations faster, more reliable, and more token-efficient than UI automation.
+Complete the user's entire task through available WebMCP / Pluno WebMCP tools wherever possible. When coverage is incomplete, build missing tools while working on the task. The intended outcome is both a completed task and a reusable toolset that lets the next agent complete a similar task purely through the available tools.
 
-Use tools in this order:
+## Discover and use the available tools
 
-1. Use native WebMCP tools when the browser exposes them to Claude/Codex.
-2. In external Chrome, use the fallback registry in the page context:
+Prefer the user's external Chrome browser when the task permits: Pluno's injected WebMCP tools make operations faster, more reliable, and more token-efficient than UI automation. Built-in agent browsers without extension support do not have the Pluno registry.
 
-   ```js
-   const registry = globalThis.__PLUNO_WEBMCP_TOOLS__;
-   const tools = (await registry.getTools()).map(({ name, description }) => ({ name, description }));
-   const tool = await registry.getTool(name);
-   const result = await tool.execute(input);
-   ```
-
-   Use the compact `tools` list to choose an exact name. Then inspect `tool.inputSchema` and its other metadata, construct matching input, and call `execute()`. Only `execute()` evaluates and caches the implementation. If execution fails with `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the exact same registry call through the external-browser debugger connection already controlled by Claude/Codex, enabling `allowUnsafeEvalBlockedByCSP` when raw CDP options are available. Do not rewrite or regenerate the implementation.
-3. If neither path is available or sufficient, use ordinary browser inspection and automation to complete the task while gathering the evidence needed to build the missing reusable tools. Do not treat completing the task through ordinary browser automation as the end of this workflow.
-
-Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in external Chrome.
-
-If the tools are insufficient or no tools exist yet, determine how the page owner would have implemented native WebMCP tools for the task while performing it in a way that gathers implementation evidence. Perform relevant actions through the UI and capture the page's network activity. Identify the exact first-party request flows: methods, endpoints, query parameters or bodies, persisted GraphQL operation names and hashes, pagination, required non-secret headers, response fields, and error behavior. Inspect the relevant page source and existing injected tool code in `globalThis.__PLUNO_WEBMCP_TOOLS__` as needed.
-
-Design an API-backed tool whenever the page itself has an API path. Internal or undocumented endpoints, persisted GraphQL operations, opaque non-secret request constants, possible frontend changes, and reliance on the browser's existing authenticated session are normal implementation details—not reasons to choose DOM scraping. Reproduce the observed first-party request from page-context code and let the browser apply its live session at runtime, such as through same-origin `fetch` with `credentials: "include"` or the page's own runtime authentication mechanism. Treat credential values as opaque: never read them merely to copy them, and never hard-code, serialize, return, or include cookies, authorization values, CSRF tokens, account identifiers, or other session-specific data. The tool code should obtain any required runtime authentication the same way the page does without exposing it.
-
-Prefer general inputs, structured outputs, and pagination that let the tool perform the action independently instead of parsing only what is currently rendered. Use DOM extraction only after inspection demonstrates that no reproducible request path exists; do not choose it merely because the available API is private, undocumented, authenticated, or may change. If the request contract later changes, a future tool update can change with it.
-
-After implementing and exercising a complete tool definition, add it to the page registry so it is immediately callable and remains available for that origin:
+Use native WebMCP tools when exposed by the browser. Otherwise, discover the Pluno registry in the external Chrome page context.
+Helpful example commands to get started:
 
 ```js
 const registry = globalThis.__PLUNO_WEBMCP_TOOLS__;
+const tools = (await registry.getTools()).map(({ name, description }) => ({ name, description }));
+const tool = await registry.getTool(name);
+const result = await tool.execute(input);
+```
+
+Use existing tools wherever useful; Reassess coverage as the task reveals further requirements.
+
+Check native WebMCP and the Pluno registry independently. An absent `document.modelContext` does not mean Pluno tools are absent. If `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the same registry call through a permitted page-context execution path, e.g. the integration's existing debugger connection using CDP `Runtime.evaluate` with `awaitPromise: true`. Do not rewrite the implementation or bypass the integration's restrictions.
+If the registry cannot be accessed, fall back to normal browser automation.
+If the registry is just empty, close the gaps while working on the task.
+
+## Close each capability gap
+
+If any necessary action cannot be completed through available tools, determine how the page owner would have implemented a native WebMCP tool for it. Treat browser inspection and UI interaction as evidence gathering for that missing capability, not as the endpoint of the workflow.
+
+Start capturing the relevant network activity before performing the action through the UI. Identify the actual first-party request flow: methods, endpoints, query parameters or bodies, persisted GraphQL operation names and hashes, pagination, required non-secret headers, response fields, and error behavior. Inspect relevant page source and existing registry implementations as needed. Gather the evidence while advancing the task so discovery does not have to be repeated afterward.
+
+Build API-backed tools whenever the page has a reproducible API path. Internal or undocumented endpoints, persisted GraphQL operations, opaque non-secret constants, and reliance on the browser's authenticated session are implementation details—not reasons to default to DOM scraping. Reproduce observed requests in page context using the browser's live session, such as same-origin `fetch` with `credentials: "include"`, or the page's own runtime authentication mechanism. Do not invent endpoints or request contracts. Use DOM extraction only when inspection establishes that no reproducible request path is available.
+
+Possible API changes are not a reason to scrape; update the tool when the request contract changes.
+
+Design reusable inputs and structured outputs that support the action independently, including relevant filters and pagination. Avoid tools limited to the currently rendered results or hard-coded to this task's dates, search terms, or selections. Obtain session-dependent authentication at runtime without exposing it; never embed credentials, cookies, authorization values, CSRF tokens, private payloads, or user-specific values in a reusable definition.
+
+## Register, use, and verify the complete workflow
+
+Once a definition is implemented and tested, add it to the registry:
+
+```js
+// Illustrative format: use the endpoint and response shape observed on the site.
+const name = "search_items";
+const description = "Search items by query and return structured results.";
+const inputSchema = {
+  type: "object",
+  properties: { query: { type: "string", description: "Search terms" } },
+  required: ["query"],
+};
+const annotations = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: true,
+};
+const code = `async ({ query }) => {
+  const response = await fetch("/api/items?query=" + encodeURIComponent(query), {
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error("Search failed: " + response.status);
+  return response.json();
+}`;
+
 const tool = await registry.addTool({
   name,
   description,
@@ -43,6 +75,8 @@ const tool = await registry.addTool({
 });
 ```
 
-Use `addTool()` for both new tools and full replacements; a matching name replaces the existing registry entry. The `code` value must be a self-contained async function string that runs in page context. Verify the added tool by calling `await tool.execute(input)` with representative input before finishing the task.
+Supply a complete definition. `code` must be a self-contained async function string that runs in page context. A matching name replaces the existing entry.
 
-NEVER include personal data, credentials, cookies, authorization headers, private raw payloads, or user-specific values in any tool definition. Generalize and sanitize everything.
+Use `await tool.execute(input)` to advance the task through the newly available capability, then continue with existing tools. Repeat this loop for the remaining gaps: one useful new tool is not enough if other required actions still depend on manual UI work.
+
+Before finishing, verify that the existing and newly built tools collectively cover the task from its normal starting state to the requested result.
