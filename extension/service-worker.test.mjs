@@ -3,6 +3,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 const requestedUrls = [];
+const requests = [];
 const createdTabUrls = [];
 const scriptInjections = [];
 const storedValues = {
@@ -18,7 +19,7 @@ globalThis.chrome = {
     onAlarm: { addListener() {} },
   },
   runtime: {
-    getManifest: () => ({ version: "0.1.12" }),
+    getManifest: () => ({ version: "0.1.13" }),
     onInstalled: { addListener() {} },
     onMessage: { addListener() {} },
     onStartup: { addListener() {} },
@@ -26,6 +27,9 @@ globalThis.chrome = {
   storage: {
     local: {
       async get(key) {
+        if (Array.isArray(key)) {
+          return Object.fromEntries(key.map((name) => [name, storedValues[name]]));
+        }
         return { [key]: storedValues[key] };
       },
       async set(values) {
@@ -55,8 +59,9 @@ globalThis.chrome = {
   },
 };
 
-globalThis.fetch = async (url) => {
+globalThis.fetch = async (url, options = {}) => {
   requestedUrls.push(url);
+  requests.push({ url, options });
   return {
     ok: true,
     status: 200,
@@ -66,8 +71,14 @@ globalThis.fetch = async (url) => {
   };
 };
 
-const { activatePage, getStatus, installToolsInPage, isSupportedPageUrl, openSetup } =
-  await import("./service-worker.js");
+const {
+  activatePage,
+  getStatus,
+  installToolsInPage,
+  isSupportedPageUrl,
+  openSetup,
+  persistAndSubmitLocalTool,
+} = await import("./service-worker.js");
 
 const definition = {
   name: "get_title",
@@ -166,6 +177,53 @@ test("selects a directly callable fallback tool by name", async () => {
   assert.throws(() => registry.getTool("missing"), /Unknown Pluno WebMCP tool: missing/);
 });
 
+test("adds a callable tool locally and registers it with native WebMCP", async () => {
+  const registrations = [];
+  const unregisteredNames = [];
+  const postedMessages = [];
+  const context = vm.createContext({
+    document: {
+      modelContext: {
+        registerTool(tool) {
+          registrations.push(tool);
+        },
+        unregisterTool(name) {
+          unregisteredNames.push(name);
+        },
+      },
+    },
+    location: { origin: "https://example.com" },
+    postMessage(message, targetOrigin) {
+      postedMessages.push({ message, targetOrigin });
+    },
+  });
+  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+
+  const registry = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
+  const replacement = {
+    ...definition,
+    description: "Return a supplied title",
+  };
+  const tool = await registry.addTool(replacement);
+
+  assert.equal(registry.length, 1);
+  assert.equal(registry.getTool("get_title"), tool);
+  assert.equal((await tool.execute({ title: "Added" })).title, "Added");
+  assert.deepEqual(unregisteredNames, ["get_title", "get_title"]);
+  assert.equal(registrations.length, 2);
+  assert.equal(
+    JSON.stringify(postedMessages),
+    JSON.stringify([{
+      message: {
+        source: "pluno-webmcp-for-anything",
+        type: "WEBMCP_LOCAL_TOOL_ADDED",
+        tool: replacement,
+      },
+      targetOrigin: "https://example.com",
+    }]),
+  );
+});
+
 test("reports when page CSP blocks lazy tool evaluation", async () => {
   const context = vm.createContext({
     document: {},
@@ -256,4 +314,32 @@ test("activates a supported background tab without a debugger", async () => {
     toolCount: 0,
     lastError: null,
   });
+});
+
+test("persists and submits a locally added tool once per definition", async () => {
+  delete storedValues.webmcpLocalTools;
+  delete storedValues.webmcpSubmittedToolFingerprints;
+  await activatePage(15, "https://example.com/search");
+  await new Promise((resolve) => setImmediate(resolve));
+  const requestCount = requests.length;
+
+  const first = await persistAndSubmitLocalTool(15, "https://example.com/search", definition);
+  const second = await persistAndSubmitLocalTool(15, "https://example.com/search", definition);
+
+  assert.deepEqual(first, { saved: true, submitted: true });
+  assert.deepEqual(second, { saved: true, submitted: false });
+  assert.deepEqual(storedValues.webmcpLocalTools["https://example.com"], [definition]);
+  assert.equal(requests.length, requestCount + 1);
+  const proposalRequest = requests.at(-1);
+  assert.equal(proposalRequest.url, "https://app.pluno.ai/api/webmcp/tool-proposals");
+  assert.equal(proposalRequest.options.method, "POST");
+  assert.equal(proposalRequest.options.headers.Authorization, "Bearer token");
+  const body = JSON.parse(proposalRequest.options.body);
+  assert.equal(body.page_url, "https://example.com");
+  assert.equal(body.updates[0].operation, "POST");
+  assert.deepEqual(body.updates[0].tool, definition);
+
+  await activatePage(16, "https://example.com/another-page");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(scriptInjections.at(-1).args[0], [definition]);
 });

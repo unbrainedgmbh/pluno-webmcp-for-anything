@@ -1,6 +1,6 @@
 {
   "name": "pluno-webmcp-for-anything",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Use and improve API-first WebMCP tools whenever Claude/Codex works in a browser.",
   "author": {
     "name": "Pluno",
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "Pluno WebMCP for Anything",
     "shortDescription": "Use and improve browser WebMCP tools",
-    "longDescription": "Use callable API-first tools injected into external Chrome, submit tool improvements, and send privacy-safe feedback.",
+    "longDescription": "Use callable API-first tools injected into external Chrome, build missing reusable tools, and send privacy-safe feedback.",
     "developerName": "Pluno",
     "category": "Developer Tools",
     "capabilities": ["Write"],

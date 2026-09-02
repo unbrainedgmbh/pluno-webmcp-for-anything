@@ -3,6 +3,8 @@ const PAIRING_ALARM = "webmcp-pairing";
 const PLUGIN_ERROR =
   "The Pluno WebMCP for Anything integration is not connected in Claude/Codex.";
 const SETUP_ERROR = "Extension setup is incomplete.";
+const LOCAL_TOOLS_STORAGE_KEY = "webmcpLocalTools";
+const SUBMITTED_FINGERPRINTS_STORAGE_KEY = "webmcpSubmittedToolFingerprints";
 const tabState = new Map();
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
@@ -32,6 +34,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     openSetup().then(() => sendResponse({ opened: true }));
     return true;
   }
+  if (message?.type === "WEBMCP_ADD_LOCAL_TOOL" && sender.tab?.id !== undefined && sender.tab.url) {
+    persistAndSubmitLocalTool(sender.tab.id, sender.tab.url, message.tool)
+      .then(sendResponse)
+      .catch(async (error) => {
+        await logPageError(sender.tab.id, `Pluno WebMCP could not save the new tool: ${error.message}`);
+        sendResponse({ saved: false });
+      });
+    return true;
+  }
   return false;
 });
 
@@ -46,6 +57,7 @@ async function activatePage(tabId, pageUrl) {
     loaded: false,
     injecting: false,
     lastError: null,
+    publishedToolNames: [],
   };
   const revision = previous.revision + 1;
   if (!isSupportedPageUrl(pageUrl)) {
@@ -57,6 +69,7 @@ async function activatePage(tabId, pageUrl) {
       loaded: false,
       injecting: false,
       lastError: null,
+      publishedToolNames: [],
     });
     return;
   }
@@ -87,7 +100,10 @@ function isLocalHostname(hostname) {
 async function activateTab(tabId, pageUrl, staleToolNames, revision) {
   if (staleToolNames.length) await unregisterTools(tabId, staleToolNames);
   if (tabState.get(tabId)?.revision !== revision) return;
-  const { webmcpToken } = await chrome.storage.local.get("webmcpToken");
+  const { webmcpToken, webmcpLocalTools = {} } = await chrome.storage.local.get([
+    "webmcpToken",
+    LOCAL_TOOLS_STORAGE_KEY,
+  ]);
   if (tabState.get(tabId)?.revision !== revision) return;
   if (!webmcpToken) {
     await logSetupError(tabId);
@@ -114,15 +130,91 @@ async function activateTab(tabId, pageUrl, staleToolNames, revision) {
     });
     return;
   }
-  const { tools } = await response.json();
+  const { tools: publishedTools } = await response.json();
   if (tabState.get(tabId)?.revision !== revision) return;
+  const localTools = webmcpLocalTools[pageOrigin] ?? [];
+  const toolsByName = new Map(publishedTools.map((tool) => [tool.name, tool]));
+  for (const tool of localTools) toolsByName.set(tool.name, tool);
+  const tools = [...toolsByName.values()];
   const injected = await injectThroughScripting(tabId, tools);
   updateCurrentTabState(tabId, revision, {
     injecting: false,
     toolNames: injected ? tools.map((tool) => tool.name) : [],
     loaded: injected,
     lastError: injected ? null : "Tool injection failed.",
+    publishedToolNames: publishedTools.map((tool) => tool.name),
   });
+}
+
+async function persistAndSubmitLocalTool(tabId, pageUrl, candidate) {
+  if (!isSupportedPageUrl(pageUrl)) throw new Error("Tools can only be added on public HTTP(S) pages.");
+  const tool = normalizeToolDefinition(candidate);
+  const pageOrigin = new URL(pageUrl).origin;
+  const stored = await chrome.storage.local.get([
+    "webmcpToken",
+    LOCAL_TOOLS_STORAGE_KEY,
+    SUBMITTED_FINGERPRINTS_STORAGE_KEY,
+  ]);
+  const localTools = stored[LOCAL_TOOLS_STORAGE_KEY] ?? {};
+  const originTools = localTools[pageOrigin] ?? [];
+  const existingIndex = originTools.findIndex((existing) => existing.name === tool.name);
+  if (existingIndex === -1) originTools.push(tool);
+  else originTools[existingIndex] = tool;
+  localTools[pageOrigin] = originTools;
+  await chrome.storage.local.set({ [LOCAL_TOOLS_STORAGE_KEY]: localTools });
+
+  const fingerprint = JSON.stringify(tool);
+  const fingerprintKey = `${pageOrigin}\n${tool.name}`;
+  const submittedFingerprints = stored[SUBMITTED_FINGERPRINTS_STORAGE_KEY] ?? {};
+  if (submittedFingerprints[fingerprintKey] === fingerprint) return { saved: true, submitted: false };
+  if (!stored.webmcpToken) return { saved: true, submitted: false };
+
+  const publishedToolNames = tabState.get(tabId)?.publishedToolNames ?? [];
+  const response = await fetch(`${API_ORIGIN}/api/webmcp/tool-proposals`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stored.webmcpToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      page_url: pageOrigin,
+      justification:
+        "The existing WebMCP catalog was insufficient for the browser task. This origin-scoped tool was implemented and exercised in the page so the missing action can be reused.",
+      updates: [{
+        operation: publishedToolNames.includes(tool.name) ? "PUT" : "POST",
+        tool,
+      }],
+    }),
+  });
+  if (!response.ok) throw new Error(`proposal submission failed (${response.status})`);
+  submittedFingerprints[fingerprintKey] = fingerprint;
+  await chrome.storage.local.set({ [SUBMITTED_FINGERPRINTS_STORAGE_KEY]: submittedFingerprints });
+  return { saved: true, submitted: true };
+}
+
+function normalizeToolDefinition(candidate) {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    throw new TypeError("A WebMCP tool definition must be an object.");
+  }
+  if (typeof candidate.name !== "string" || !/^[A-Za-z0-9_.-]{1,128}$/.test(candidate.name)) {
+    throw new TypeError("A WebMCP tool needs a valid name.");
+  }
+  if (typeof candidate.description !== "string" || !candidate.description.length) {
+    throw new TypeError("A WebMCP tool needs a description.");
+  }
+  if (!candidate.inputSchema || candidate.inputSchema.type !== "object") {
+    throw new TypeError("A WebMCP tool needs an object inputSchema.");
+  }
+  if (typeof candidate.code !== "string" || !candidate.code.length) {
+    throw new TypeError("A WebMCP tool needs implementation code.");
+  }
+  return JSON.parse(JSON.stringify({
+    name: candidate.name,
+    description: candidate.description,
+    inputSchema: candidate.inputSchema,
+    ...(candidate.annotations ? { annotations: candidate.annotations } : {}),
+    code: candidate.code,
+  }));
 }
 
 function updateCurrentTabState(tabId, revision, updates) {
@@ -168,7 +260,7 @@ async function injectThroughScripting(tabId, tools) {
 
 function installToolsInPage(definitions) {
   // External Chrome remains useful before native WebMCP is enabled because the agent can call this registry through code.
-  const callableTools = definitions.map((definition) => {
+  const createCallableTool = (definition) => {
     let implementation;
     return Object.freeze({
       ...definition,
@@ -196,7 +288,44 @@ function installToolsInPage(definitions) {
         return implementation(input);
       },
     });
-  });
+  };
+  const registerNativeTool = (definition) => {
+    if (!document.modelContext?.registerTool) return;
+    document.modelContext.unregisterTool?.(definition.name);
+    const registration = {
+      name: definition.name,
+      description: definition.description,
+      inputSchema: definition.inputSchema,
+      execute: definition.execute,
+    };
+    if (definition.annotations) registration.annotations = definition.annotations;
+    document.modelContext.registerTool(registration);
+  };
+  const normalizeDefinition = (candidate) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      throw new TypeError("A WebMCP tool definition must be an object.");
+    }
+    if (typeof candidate.name !== "string" || !/^[A-Za-z0-9_.-]{1,128}$/.test(candidate.name)) {
+      throw new TypeError("A WebMCP tool needs a valid name.");
+    }
+    if (typeof candidate.description !== "string" || !candidate.description.length) {
+      throw new TypeError("A WebMCP tool needs a description.");
+    }
+    if (!candidate.inputSchema || candidate.inputSchema.type !== "object") {
+      throw new TypeError("A WebMCP tool needs an object inputSchema.");
+    }
+    if (typeof candidate.code !== "string" || !candidate.code.length) {
+      throw new TypeError("A WebMCP tool needs implementation code.");
+    }
+    return JSON.parse(JSON.stringify({
+      name: candidate.name,
+      description: candidate.description,
+      inputSchema: candidate.inputSchema,
+      ...(candidate.annotations ? { annotations: candidate.annotations } : {}),
+      code: candidate.code,
+    }));
+  };
+  const callableTools = definitions.map((definition) => createCallableTool(normalizeDefinition(definition)));
   Object.defineProperty(callableTools, "getTool", {
     value: (name) => {
       const tool = callableTools.find((definition) => definition.name === name);
@@ -226,23 +355,31 @@ function installToolsInPage(definitions) {
     enumerable: false,
     writable: false,
   });
+  Object.defineProperty(callableTools, "addTool", {
+    value: async (candidate) => {
+      const definition = normalizeDefinition(candidate);
+      const tool = createCallableTool(definition);
+      const existingIndex = callableTools.findIndex((existing) => existing.name === tool.name);
+      if (existingIndex === -1) callableTools.push(tool);
+      else callableTools.splice(existingIndex, 1, tool);
+      registerNativeTool(tool);
+      globalThis.postMessage({
+        source: "pluno-webmcp-for-anything",
+        type: "WEBMCP_LOCAL_TOOL_ADDED",
+        tool: definition,
+      }, location.origin);
+      return tool;
+    },
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  });
   Object.defineProperty(globalThis, "__PLUNO_WEBMCP_TOOLS__", {
-    value: Object.freeze(callableTools),
+    value: callableTools,
     configurable: true,
     enumerable: false,
   });
-  if (!document.modelContext?.registerTool) return;
-  for (const definition of callableTools) {
-    document.modelContext.unregisterTool?.(definition.name);
-    const registration = {
-      name: definition.name,
-      description: definition.description,
-      inputSchema: definition.inputSchema,
-      execute: definition.execute,
-    };
-    if (definition.annotations) registration.annotations = definition.annotations;
-    document.modelContext.registerTool(registration);
-  }
+  for (const definition of callableTools) registerNativeTool(definition);
 }
 
 async function unregisterTools(tabId, toolNames) {
@@ -331,4 +468,13 @@ function randomSecret() {
   return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-export { activateOpenTabs, activatePage, getStatus, installToolsInPage, isSupportedPageUrl, openSetup };
+export {
+  activateOpenTabs,
+  activatePage,
+  getStatus,
+  installToolsInPage,
+  isSupportedPageUrl,
+  normalizeToolDefinition,
+  openSetup,
+  persistAndSubmitLocalTool,
+};
