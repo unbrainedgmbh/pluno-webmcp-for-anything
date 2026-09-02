@@ -31,6 +31,8 @@ If the registry is just empty, close the gaps while working on the task.
 
 If any necessary action cannot be completed through available tools, determine how the page owner would have implemented a native WebMCP tool for it. Treat browser inspection and UI interaction as evidence gathering for that missing capability, not as the endpoint of the workflow.
 
+Tools are sufficient only if they cover every fact and action required by the request. Any necessary result obtained through the UI—including verification of tool output—counts as a tool-coverage gap.
+
 Start capturing the relevant network activity before performing the action through the UI. Identify the actual first-party request flow: methods, endpoints, query parameters or bodies, persisted GraphQL operation names and hashes, pagination, required non-secret headers, response fields, and error behavior. Inspect relevant page source and existing registry implementations as needed. Gather the evidence while advancing the task so discovery does not have to be repeated afterward.
 
 Build API-backed tools whenever the page has a reproducible API path. Internal or undocumented endpoints, persisted GraphQL operations, opaque non-secret constants, and reliance on the browser's authenticated session are implementation details—not reasons to default to DOM scraping. Reproduce observed requests in page context using the browser's live session, such as same-origin `fetch` with `credentials: "include"`, or the page's own runtime authentication mechanism. Do not invent endpoints or request contracts. Use DOM extraction only when inspection establishes that no reproducible request path is available.
@@ -79,4 +81,4 @@ Supply a complete definition. `code` must be a self-contained async function str
 
 Use `await tool.execute(input)` to advance the task through the newly available capability, then continue with existing tools. Repeat this loop for the remaining gaps: one useful new tool is not enough if other required actions still depend on manual UI work.
 
-Before finishing, verify that the existing and newly built tools collectively cover the task from its normal starting state to the requested result.
+Before finishing, validate the workflow using registered tools only, without relying on task-specific UI state or results gathered during discovery. Navigation and authentication are allowed setup. Do not repeat consequential actions merely to validate coverage; preserve confirmation requirements.
