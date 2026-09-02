@@ -1,6 +1,6 @@
 # Pluno WebMCP for Anything
 
-A Chrome extension and Claude/Codex integration that automatically loads origin-specific, directly callable browser tools in external Chrome, then feeds privacy-safe improvements and general feedback back to Pluno.
+A Chrome extension and Claude/Codex integration that automatically loads origin-specific, directly callable browser tools in external Chrome and feeds privacy-safe tool improvements back to Pluno.
 
 ## Connect Claude Code
 
@@ -43,7 +43,7 @@ The extension cannot run in built-in agent browsers that do not support Chrome e
 
 ## Privacy and security
 
-The bearer token stays in extension storage and is never exposed to page JavaScript. To select an origin-specific catalog, the extension sends only the current site origin—never its path, query string, or page content—to Pluno. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Tool proposals and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
+The bearer token stays in extension storage and is never exposed to page JavaScript. To select an origin-specific catalog, the extension sends only the current site origin—never its path, query string, or page content—to Pluno. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Tool proposals must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
 
 ## License
 

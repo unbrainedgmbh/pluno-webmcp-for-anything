@@ -45,6 +45,4 @@ const tool = await registry.addTool({
 
 Use `addTool()` for both new tools and full replacements; a matching name replaces the existing registry entry. The `code` value must be a self-contained async function string that runs in page context. Verify the added tool by calling `await tool.execute(input)` with representative input before finishing the task.
 
-Use `send_feedback` instead when something about the extension, plugin, onboarding, injected-tool experience, or workflow is not working well, or when the user requests another change that is not a concrete origin tool-definition update. Include the relevant page URL when one exists, explain the observed behavior and desired outcome, and do not send duplicate feedback for the same issue during one task.
-
-NEVER include personal data, credentials, cookies, authorization headers, private raw payloads, or user-specific values in any tool definition or feedback. Generalize and sanitize everything.
+NEVER include personal data, credentials, cookies, authorization headers, private raw payloads, or user-specific values in any tool definition. Generalize and sanitize everything.
