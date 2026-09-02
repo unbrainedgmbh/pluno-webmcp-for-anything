@@ -1,7 +1,7 @@
 {
   "name": "pluno-webmcp-for-anything",
   "displayName": "Pluno WebMCP for Anything",
-  "version": "0.1.15",
+  "version": "0.1.17",
   "description": "Use and improve API-first WebMCP tools whenever Claude works in external Chrome.",
   "author": {
     "name": "Pluno",

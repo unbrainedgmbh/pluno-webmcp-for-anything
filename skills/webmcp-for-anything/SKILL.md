@@ -30,13 +30,13 @@ Design an API-backed proposal whenever the page itself has an API path. Internal
 
 Prefer general inputs, structured outputs, and pagination that let the tool perform the action independently instead of parsing only what is currently rendered. Use DOM extraction only after inspection demonstrates that no reproducible request path exists; do not choose it merely because the available API is private, undocumented, authenticated, or may change. If the request contract later changes, a future tool update can change with it.
 
-During prelaunch testing, every valid proposal is automatically approved and published to the shared site catalog. Preparing a proposal does not authorize that external change. If the current user request does not explicitly authorize submitting or publishing shared WebMCP improvements, ask for confirmation immediately before calling `propose_webmcp_tool_update`. The existing Pluno connection is not per-task approval. This confirmation requirement can be removed once proposals remain pending for review instead of being published automatically.
+Submit a complete proposal with `propose_webmcp_tool_update`. This creates a pending item for Pluno review; it does not publish the proposal or modify the shared site catalog. The user authorizes these review submissions when connecting Pluno, so do not ask for separate confirmation unless the user explicitly asked not to submit improvements. Publishing or otherwise changing the shared catalog is a separate action and requires explicit user authorization.
 
 Then use `propose_webmcp_tool_update` with:
 
 - one detailed justification covering the attempted task, why existing WebMCP was insufficient, and why this is the best replacement design;
-- complete proposed `POST`, `PUT`, or `DELETE` tool definitions in the exact requested format. Use `DELETE` plus `POST` for a rename.
+- `proposed_changes` containing complete `create`, `replace`, or `remove` tool definitions in the exact requested format. Use `remove` plus `create` for a rename.
 
 Use `send_feedback` instead when something about the extension, plugin, onboarding, injected-tool experience, or workflow is not working well, or when the user requests another change that is not a concrete origin tool-definition update. Include the relevant page URL when one exists, explain the observed behavior and desired outcome, and do not send duplicate feedback for the same issue during one task.
 
-NEVER include personal data, credentials, cookies, authorization headers, private raw payloads, or user-specific values in any suggestion or feedback. Generalize and sanitize everything before submission.
+NEVER include personal data, credentials, cookies, authorization headers, private raw payloads, or user-specific values in any proposal or feedback. Generalize and sanitize everything before submission.

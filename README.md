@@ -43,7 +43,7 @@ The extension cannot run in built-in agent browsers that do not support Chrome e
 
 ## Privacy and security
 
-The bearer token stays in extension storage and is never exposed to page JavaScript. To select an origin-specific catalog, the extension sends only the current site origin—never its path, query string, or page content—to Pluno. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Improvement suggestions and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
+The bearer token stays in extension storage and is never exposed to page JavaScript. To select an origin-specific catalog, the extension sends only the current site origin—never its path, query string, or page content—to Pluno. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Tool proposals and feedback must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
 
 ## License
 
