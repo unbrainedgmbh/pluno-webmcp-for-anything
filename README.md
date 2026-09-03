@@ -26,12 +26,8 @@ Start a new Codex task and authenticate the included `pluno-webmcp` MCP server w
 
 ## Install the Chrome extension
 
-Until a Chrome Web Store package is available:
-
-1. Clone or download this repository.
-2. Open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
-3. Select the `extension` directory.
-4. Finish setup at `https://app.pluno.ai/webmcp/signup` when the extension opens it.
+1. Install [Pluno WebMCP for Anything from the Chrome Web Store](https://chromewebstore.google.com/detail/pluno-webmcp-for-anything/fbdnbpkcboonegpniiabdgpfjjkpnifn).
+2. Finish setup at [Pluno](https://app.pluno.ai/webmcp/signup) when the extension opens it.
 
 Both the extension and the Claude/Codex integration must be connected before tools are injected.
 
@@ -40,6 +36,14 @@ The extension injects origin-specific tools automatically on every supported pag
 It always exposes tools in `globalThis.__PLUNO_WEBMCP_TOOLS__`; the array provides `await globalThis.__PLUNO_WEBMCP_TOOLS__.getTools()` with the native discovery shape and `globalThis.__PLUNO_WEBMCP_TOOLS__.getTool(name)` for exact-name selection. `await globalThis.__PLUNO_WEBMCP_TOOLS__.addTool(definition)` immediately adds or replaces an origin-scoped tool, persists it locally, and sends the definition to Pluno as a pending review proposal. When Chrome also provides the native WebMCP API, the extension registers the same tools there automatically. If strict page CSP blocks normal execution, Claude/Codex repeats the same registry call through its own browser debugger connection rather than rewriting the implementation.
 
 The extension cannot run in built-in agent browsers that do not support Chrome extensions. Use Claude/Codex with external Chrome to get the injected Pluno tools; they make supported browser operations faster, more reliable, and more token-efficient than UI automation.
+
+## Development installation
+
+To test local extension changes:
+
+1. Clone or download this repository.
+2. Open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
+3. Select the `extension` directory and complete the setup page it opens.
 
 ## Privacy and security
 

@@ -2,6 +2,8 @@
 
 ## Listing
 
+Live listing: [Pluno WebMCP for Anything](https://chromewebstore.google.com/detail/pluno-webmcp-for-anything/fbdnbpkcboonegpniiabdgpfjjkpnifn)
+
 Name: Pluno WebMCP for Anything
 
 Category: Developer Tools
@@ -69,5 +71,4 @@ Tools load automatically on supported pages; Claude/Codex does not need to attac
 
 - Chrome Web Store developer/publisher account
 - Support email and distribution countries
-- Production extension listing URL for `NEXT_PUBLIC_WEBMCP_EXTENSION_INSTALL_URL`
 - Confirmation that the public privacy policy contains the data practices described above
