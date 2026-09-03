@@ -1,0 +1,89 @@
+name: Chrome Web Store extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "extension/**"
+      - ".github/scripts/publish_chrome_web_store_extension*"
+      - ".github/workflows/publish-extension.yaml"
+  pull_request:
+    paths:
+      - "extension/**"
+      - ".github/scripts/publish_chrome_web_store_extension*"
+      - ".github/workflows/publish-extension.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chrome-web-store-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check release version
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          REF_NAME: ${{ github.ref }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from "node:fs";
+          import { execFileSync } from "node:child_process";
+          const { version } = JSON.parse(readFileSync("extension/manifest.json", "utf8"));
+          if (!/^(0|[1-9]\d*)(\.(0|[1-9]\d*)){0,3}$/.test(version) ||
+              version.split(".").some(n => Number(n) > 65535) ||
+              !version.split(".").some(n => Number(n) > 0)) {
+            throw new Error("Invalid Chrome extension version: " + version);
+          }
+          let publish = process.env.REF_NAME === "refs/heads/main" && process.env.EVENT_NAME === "workflow_dispatch";
+          if (process.env.EVENT_NAME === "push" && process.env.REF_NAME === "refs/heads/main") {
+            const previous = JSON.parse(execFileSync("git", ["show", `${process.env.BEFORE_SHA}:extension/manifest.json`], { encoding: "utf8" })).version;
+            const parts = value => [...value.split(".").map(Number), 0, 0, 0].slice(0, 4);
+            const a = parts(version), b = parts(previous);
+            const firstDifference = a.findIndex((n, i) => n !== b[i]);
+            if (firstDifference >= 0 && a[firstDifference] < b[firstDifference]) throw new Error("Extension version must increase");
+            publish = firstDifference >= 0;
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\npublish=${publish}\n`);
+          console.log(`Extension ${version}; submit=${publish}`);
+          NODE
+
+      - name: Test extension and publishing safeguards
+        run: node --test extension/*.test.mjs .github/scripts/*.test.mjs
+
+      - name: Package extension
+        run: |
+          EXTENSION_ZIP_PATH="$RUNNER_TEMP/pluno-webmcp-for-anything-${{ steps.release.outputs.version }}.zip"
+          cd extension
+          zip -r "$EXTENSION_ZIP_PATH" . -x '*.test.mjs' '.DS_Store' '*/.DS_Store'
+          echo "EXTENSION_ZIP_PATH=$EXTENSION_ZIP_PATH" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pluno-webmcp-for-anything-${{ steps.release.outputs.version }}
+          path: ${{ env.EXTENSION_ZIP_PATH }}
+          if-no-files-found: error
+
+      - name: Submit to Chrome Web Store for review
+        if: steps.release.outputs.publish == 'true'
+        env:
+          CHROME_WEB_STORE_SERVICE_ACCOUNT_JSON: ${{ secrets.CHROME_WEB_STORE_SERVICE_ACCOUNT_JSON }}
+          CHROME_WEB_STORE_PUBLISHER_ID: ${{ secrets.CHROME_WEB_STORE_PUBLISHER_ID }}
+          CHROME_WEB_STORE_EXTENSION_ID: fbdnbpkcboonegpniiabdgpfjjkpnifn
+        run: bash .github/scripts/publish_chrome_web_store_extension.sh

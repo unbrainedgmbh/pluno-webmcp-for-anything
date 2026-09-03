@@ -67,6 +67,19 @@ Tools load automatically on supported pages; Claude/Codex does not need to attac
 - Small promotional tile: `store-assets/small-promo-440x280.png`
 - Marquee promotional tile: `store-assets/marquee-1400x560.png`
 
+## Automatic submission
+
+GitHub Actions packages and submits the extension when `extension/manifest.json` increases its version on `main`. Pull requests run tests and create a ZIP artifact without publishing. Documentation-only updates do not submit a release. The **Chrome Web Store extension** workflow also supports a manual run on `main` to submit the current version or retry a failed submission.
+
+Configure these secrets in this repository (the Pluno monorepo already uses the same secret names):
+
+- `CHROME_WEB_STORE_SERVICE_ACCOUNT_JSON`: the service-account JSON key authorized in the Chrome Web Store publisher account.
+- `CHROME_WEB_STORE_PUBLISHER_ID`: that publisher's ID.
+
+The workflow targets extension `fbdnbpkcboonegpniiabdgpfjjkpnifn`. If it belongs to the same publisher as the other Pluno extensions, reuse that publisher's authorized service account. GitHub cannot reveal existing secret values for copying; add them from the original secure source or share organization secrets with this repository.
+
+Submission uses Google's normal review process and publishes after approval. It does not bypass review or update dashboard-only listing fields. If another version is already under review, CI fails visibly; rerun after that review finishes.
+
 ## Final dashboard inputs
 
 - Chrome Web Store developer/publisher account
