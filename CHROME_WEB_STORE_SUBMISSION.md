@@ -8,7 +8,7 @@ Name: Pluno WebMCP for Anything
 
 Category: Developer Tools
 
-Summary: Gives Claude/Codex fast, reliable, API-first tools in external Chrome.
+Summary: Give Claude & Codex MCP tools for any website!
 
 Detailed description:
 
