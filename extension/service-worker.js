@@ -4,6 +4,7 @@ const PLUGIN_ERROR =
   "The Pluno WebMCP for Anything integration is not connected in Claude/Codex.";
 const SETUP_ERROR = "Extension setup is incomplete.";
 const LOCAL_TOOLS_STORAGE_KEY = "webmcpLocalTools";
+const REMOVED_TOOLS_STORAGE_KEY = "webmcpRemovedTools";
 const SUBMITTED_FINGERPRINTS_STORAGE_KEY = "webmcpSubmittedToolFingerprints";
 const tabState = new Map();
 
@@ -35,7 +36,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message?.type === "WEBMCP_ADD_LOCAL_TOOL" && sender.tab?.id !== undefined && sender.tab.url) {
-    persistAndSubmitLocalTool(sender.tab.id, sender.tab.url, message.tool)
+    persistAndSubmitLocalTool(sender.tab.id, sender.tab.url, message.tool, message.operation)
       .then(sendResponse)
       .catch(async (error) => {
         await logPageError(sender.tab.id, `Pluno WebMCP could not save the new tool: ${error.message}`);
@@ -100,9 +101,10 @@ function isLocalHostname(hostname) {
 async function activateTab(tabId, pageUrl, staleToolNames, revision) {
   if (staleToolNames.length) await unregisterTools(tabId, staleToolNames);
   if (tabState.get(tabId)?.revision !== revision) return;
-  const { webmcpToken, webmcpLocalTools = {} } = await chrome.storage.local.get([
+  const { webmcpToken, webmcpLocalTools = {}, webmcpRemovedTools = {} } = await chrome.storage.local.get([
     "webmcpToken",
     LOCAL_TOOLS_STORAGE_KEY,
+    REMOVED_TOOLS_STORAGE_KEY,
   ]);
   if (tabState.get(tabId)?.revision !== revision) return;
   if (!webmcpToken) {
@@ -135,6 +137,7 @@ async function activateTab(tabId, pageUrl, staleToolNames, revision) {
   const localTools = webmcpLocalTools[pageOrigin] ?? [];
   const toolsByName = new Map(publishedTools.map((tool) => [tool.name, tool]));
   for (const tool of localTools) toolsByName.set(tool.name, tool);
+  for (const name of webmcpRemovedTools[pageOrigin] ?? []) toolsByName.delete(name);
   const tools = [...toolsByName.values()];
   const injected = await injectThroughScripting(tabId, tools);
   updateCurrentTabState(tabId, revision, {
@@ -146,24 +149,36 @@ async function activateTab(tabId, pageUrl, staleToolNames, revision) {
   });
 }
 
-async function persistAndSubmitLocalTool(tabId, pageUrl, candidate) {
+async function persistAndSubmitLocalTool(tabId, pageUrl, candidate, operation) {
   if (!isSupportedPageUrl(pageUrl)) throw new Error("Tools can only be added on public HTTP(S) pages.");
   const tool = normalizeToolDefinition(candidate);
   const pageOrigin = new URL(pageUrl).origin;
   const stored = await chrome.storage.local.get([
     "webmcpToken",
     LOCAL_TOOLS_STORAGE_KEY,
+    REMOVED_TOOLS_STORAGE_KEY,
     SUBMITTED_FINGERPRINTS_STORAGE_KEY,
   ]);
   const localTools = stored[LOCAL_TOOLS_STORAGE_KEY] ?? {};
   const originTools = localTools[pageOrigin] ?? [];
   const existingIndex = originTools.findIndex((existing) => existing.name === tool.name);
-  if (existingIndex === -1) originTools.push(tool);
+  if (operation === "DELETE") {
+    if (existingIndex !== -1) originTools.splice(existingIndex, 1);
+  } else if (existingIndex === -1) originTools.push(tool);
   else originTools[existingIndex] = tool;
   localTools[pageOrigin] = originTools;
-  await chrome.storage.local.set({ [LOCAL_TOOLS_STORAGE_KEY]: localTools });
+  const removedTools = stored[REMOVED_TOOLS_STORAGE_KEY] ?? {};
+  const removedNames = new Set(removedTools[pageOrigin] ?? []);
+  // Remember removals so a pending shared-catalog proposal does not restore the tool on reload.
+  if (operation === "DELETE") removedNames.add(tool.name);
+  else removedNames.delete(tool.name);
+  removedTools[pageOrigin] = [...removedNames];
+  await chrome.storage.local.set({
+    [LOCAL_TOOLS_STORAGE_KEY]: localTools,
+    [REMOVED_TOOLS_STORAGE_KEY]: removedTools,
+  });
 
-  const fingerprint = JSON.stringify(tool);
+  const fingerprint = operation ? JSON.stringify({ operation, tool }) : JSON.stringify(tool);
   const fingerprintKey = `${pageOrigin}\n${tool.name}`;
   const submittedFingerprints = stored[SUBMITTED_FINGERPRINTS_STORAGE_KEY] ?? {};
   if (submittedFingerprints[fingerprintKey] === fingerprint) return { saved: true, submitted: false };
@@ -181,7 +196,7 @@ async function persistAndSubmitLocalTool(tabId, pageUrl, candidate) {
       justification:
         "The existing WebMCP catalog was insufficient for the browser task. This origin-scoped tool was implemented and exercised in the page so the missing action can be reused.",
       updates: [{
-        operation: publishedToolNames.includes(tool.name) ? "PUT" : "POST",
+        operation: operation ?? (publishedToolNames.includes(tool.name) ? "PUT" : "POST"),
         tool,
       }],
     }),
@@ -358,10 +373,11 @@ function installToolsInPage(definitions) {
   Object.defineProperty(callableTools, "addTool", {
     value: async (candidate) => {
       const definition = normalizeDefinition(candidate);
+      if (callableTools.some((existing) => existing.name === definition.name)) {
+        return { error: "Tool " + definition.name + " already exists, use updateTool instead." };
+      }
       const tool = createCallableTool(definition);
-      const existingIndex = callableTools.findIndex((existing) => existing.name === tool.name);
-      if (existingIndex === -1) callableTools.push(tool);
-      else callableTools.splice(existingIndex, 1, tool);
+      callableTools.push(tool);
       registerNativeTool(tool);
       globalThis.postMessage({
         source: "pluno-webmcp-for-anything",
@@ -369,6 +385,47 @@ function installToolsInPage(definitions) {
         tool: definition,
       }, location.origin);
       return tool;
+    },
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  });
+  Object.defineProperty(callableTools, "updateTool", {
+    value: async (candidate) => {
+      const definition = normalizeDefinition(candidate);
+      const existingIndex = callableTools.findIndex((existing) => existing.name === definition.name);
+      if (existingIndex === -1) {
+        return { error: "Tool " + definition.name + " does not exist, use addTool instead." };
+      }
+      const tool = createCallableTool(definition);
+      callableTools.splice(existingIndex, 1, tool);
+      registerNativeTool(tool);
+      globalThis.postMessage({
+        source: "pluno-webmcp-for-anything",
+        type: "WEBMCP_LOCAL_TOOL_ADDED",
+        operation: "PUT",
+        tool: definition,
+      }, location.origin);
+      return tool;
+    },
+    configurable: false,
+    enumerable: false,
+    writable: false,
+  });
+  Object.defineProperty(callableTools, "removeTool", {
+    value: async (name) => {
+      const existingIndex = callableTools.findIndex((existing) => existing.name === name);
+      if (existingIndex === -1) return { error: "Tool " + name + " does not exist." };
+      const definition = normalizeDefinition(callableTools[existingIndex]);
+      callableTools.splice(existingIndex, 1);
+      document.modelContext?.unregisterTool?.(name);
+      globalThis.postMessage({
+        source: "pluno-webmcp-for-anything",
+        type: "WEBMCP_LOCAL_TOOL_ADDED",
+        operation: "DELETE",
+        tool: definition,
+      }, location.origin);
+      return { removed: true, name };
     },
     configurable: false,
     enumerable: false,

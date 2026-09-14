@@ -57,3 +57,22 @@ test("activates every page immediately", async () => {
     }),
   );
 });
+
+
+test("forwards explicit update and remove operations", async () => {
+  const messages = [];
+  let listener;
+  const window = { addEventListener(type, callback) { listener = callback; } };
+  vm.runInContext(source, vm.createContext({
+    window,
+    location: { href: "https://example.com" },
+    chrome: { runtime: { async sendMessage(message) { messages.push(message); } } },
+  }));
+  for (const operation of ["PUT", "DELETE"]) {
+    listener({ source: window, data: {
+      source: "pluno-webmcp-for-anything", type: "WEBMCP_LOCAL_TOOL_ADDED",
+      operation, tool: { name: "get_title" },
+    } });
+    assert.equal(messages.at(-1).operation, operation);
+  }
+});

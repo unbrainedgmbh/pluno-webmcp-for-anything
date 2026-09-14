@@ -177,7 +177,7 @@ test("selects a directly callable fallback tool by name", async () => {
   assert.throws(() => registry.getTool("missing"), /Unknown Pluno WebMCP tool: missing/);
 });
 
-test("adds a callable tool locally and registers it with native WebMCP", async () => {
+test("updates a callable tool locally and registers it with native WebMCP", async () => {
   const registrations = [];
   const unregisteredNames = [];
   const postedMessages = [];
@@ -204,7 +204,12 @@ test("adds a callable tool locally and registers it with native WebMCP", async (
     ...definition,
     description: "Return a supplied title",
   };
-  const tool = await registry.addTool(replacement);
+  const duplicate = await registry.addTool(replacement);
+  assert.match(duplicate.error, /already exists, use updateTool instead/);
+  assert.equal(registry.getTool("get_title").description, definition.description);
+  assert.equal(postedMessages.length, 0);
+  assert.equal(registrations.length, 1);
+  const tool = await registry.updateTool(replacement);
 
   assert.equal(registry.length, 1);
   assert.equal(registry.getTool("get_title"), tool);
@@ -217,6 +222,7 @@ test("adds a callable tool locally and registers it with native WebMCP", async (
       message: {
         source: "pluno-webmcp-for-anything",
         type: "WEBMCP_LOCAL_TOOL_ADDED",
+        operation: "PUT",
         tool: replacement,
       },
       targetOrigin: "https://example.com",
@@ -342,4 +348,66 @@ test("persists and submits a locally added tool once per definition", async () =
   await activatePage(16, "https://example.com/another-page");
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(scriptInjections.at(-1).args[0], [definition]);
+});
+
+
+test("adds, removes, and re-adds local tools without native WebMCP", async () => {
+  const messages = [];
+  const context = vm.createContext({
+    document: {},
+    location: { origin: "https://example.com" },
+    postMessage(message) { messages.push(message); },
+  });
+  vm.runInContext(`(${installToolsInPage.toString()})([])`, context);
+  const registry = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
+  assert.match((await registry.updateTool(definition)).error, /does not exist, use addTool instead/);
+  assert.match((await registry.removeTool(definition.name)).error, /does not exist/);
+  assert.equal(messages.length, 0);
+  const added = await registry.addTool(definition);
+  assert.equal((await added.execute({ title: "Added" })).title, "Added");
+  assert.equal((await registry.removeTool(definition.name)).removed, true);
+  assert.equal(registry.length, 0);
+  assert.equal((await registry.getTools()).length, 0);
+  assert.throws(() => registry.getTool(definition.name), /Unknown/);
+  assert.equal(messages.at(-1).operation, "DELETE");
+  assert.equal(messages.at(-1).tool.code, definition.code);
+  assert.equal((await registry.addTool(definition)).name, definition.name);
+});
+
+test("removal unregisters the native tool", async () => {
+  const removed = [];
+  const context = vm.createContext({
+    document: { modelContext: { registerTool() {}, unregisterTool(name) { removed.push(name); } } },
+    location: { origin: "https://example.com" },
+    postMessage() {},
+  });
+  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+  removed.length = 0;
+  const registry = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
+  await registry.removeTool(definition.name);
+  assert.deepEqual(removed, [definition.name]);
+});
+
+test("explicit updates and removals persist and submit without cached tab state", async () => {
+  delete storedValues.webmcpLocalTools;
+  delete storedValues.webmcpRemovedTools;
+  delete storedValues.webmcpSubmittedToolFingerprints;
+  await persistAndSubmitLocalTool(999, "https://example.com", definition, "PUT");
+  assert.equal(JSON.parse(requests.at(-1).options.body).updates[0].operation, "PUT");
+  await persistAndSubmitLocalTool(999, "https://example.com", definition, "DELETE");
+  assert.equal(JSON.parse(requests.at(-1).options.body).updates[0].operation, "DELETE");
+  assert.deepEqual(storedValues.webmcpLocalTools["https://example.com"], []);
+  assert.deepEqual(storedValues.webmcpRemovedTools["https://example.com"], [definition.name]);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ tools: [definition] }) });
+  try {
+    await activatePage(998, "https://example.com/reloaded");
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(scriptInjections.at(-1).args[0], []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  await persistAndSubmitLocalTool(999, "https://example.com", definition);
+  assert.deepEqual(storedValues.webmcpRemovedTools["https://example.com"], []);
+  assert.deepEqual(storedValues.webmcpLocalTools["https://example.com"], [definition]);
 });

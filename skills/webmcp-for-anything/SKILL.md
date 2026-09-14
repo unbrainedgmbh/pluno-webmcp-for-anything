@@ -43,6 +43,6 @@ const tool = await registry.addTool({
 });
 ```
 
-Use `addTool()` for both new tools and full replacements; a matching name replaces the existing registry entry. The `code` value must be a self-contained async function string that runs in page context. Verify the added tool by calling `await tool.execute(input)` with representative input before finishing the task.
+Use `addTool(definition)` for new tools. If the name already exists locally, it returns `{ error: "Tool <name> already exists, use updateTool instead." }` without changing the tool. Use `updateTool(definition)` to replace an existing tool with a complete definition; successful add and update calls return the callable tool. Use `removeTool(name)` to remove an existing tool; success returns `{ removed: true, name }`. Updating or removing a missing tool returns an `{ error }` result. These results describe local registry changes only. The `code` value must be a self-contained async function string that runs in page context. Verify the added tool by calling `await tool.execute(input)` with representative input before finishing the task.
 
 NEVER include personal data, credentials, cookies, authorization headers, private raw payloads, or user-specific values in any tool definition. Generalize and sanitize everything.

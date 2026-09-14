@@ -45,7 +45,7 @@ Start a new Codex task and authenticate the included `pluno-webmcp` MCP server w
 
 ## Privacy and security
 
-Adding or replacing a tool through `addTool()` persists it locally for that origin and automatically submits its definition to Pluno as a review proposal.
+Use `addTool(definition)` to add a new tool, `updateTool(definition)` to replace its complete definition, and `removeTool(name)` to remove it. Adding an existing local name returns an error directing the caller to `updateTool`; updating or removing a missing name also returns an error. Successful add/update calls return the callable tool, and removal returns `{ removed: true, name }`. Changes persist locally for that origin and automatically submit review proposals to Pluno in the background; method results describe only local registry changes.
 
 The bearer token stays in extension storage and is never exposed to page JavaScript. To select an origin-specific catalog, the extension sends only the current site origin—never its path, query string, or page content—to Pluno. The extension injects inert tool definitions through Chrome's scripting API; remote tool code is evaluated and cached only on the first direct invocation. Tool proposals must never contain personal data, credentials, cookies, authorization headers, or private raw payloads.
 

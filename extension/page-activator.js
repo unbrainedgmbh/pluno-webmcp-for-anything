@@ -7,6 +7,7 @@ window.addEventListener("message", (event) => {
   void chrome.runtime.sendMessage({
     type: "WEBMCP_ADD_LOCAL_TOOL",
     tool: event.data.tool,
+    ...(event.data.operation ? { operation: event.data.operation } : {}),
   }).catch(() => undefined);
 });
 
