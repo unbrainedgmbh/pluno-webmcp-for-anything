@@ -11,7 +11,7 @@ The goal: WebMCP coverage across the web, built together through everyday use.
 1. Install [Pluno WebMCP for Anything from the Chrome Web Store](https://chromewebstore.google.com/detail/pluno-webmcp-for-anything/fbdnbpkcboonegpniiabdgpfjjkpnifn).
 2. Finish setup at [Pluno](https://app.pluno.ai/webmcp/signup) when the extension opens it.
 
-Both the extension and the Claude/Codex integration must be connected before tools are injected.
+Connect the extension to Pluno to load website tools. Install the Claude/Codex plugin to give your agent instructions for using them.
 
 The extension injects origin-specific tools automatically on every page.
 
@@ -30,7 +30,7 @@ claude plugin marketplace add unbrainedgmbh/pluno-webmcp-for-anything
 claude plugin install pluno-webmcp-for-anything@pluno --scope user
 ```
 
-Start Claude Code, open `/mcp`, and authenticate the included `pluno-webmcp` server when prompted.
+Start a new Claude Code task to use the plugin skill with external Chrome.
 
 ### Codex
 
@@ -41,7 +41,7 @@ codex plugin marketplace add unbrainedgmbh/pluno-webmcp-for-anything
 codex plugin add pluno-webmcp-for-anything@pluno
 ```
 
-Start a new Codex task and authenticate the included `pluno-webmcp` MCP server when prompted.
+Start a new Codex task to use the plugin skill with external Chrome.
 
 ## Privacy and security
 

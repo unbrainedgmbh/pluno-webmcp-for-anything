@@ -1,7 +1,5 @@
 const API_ORIGIN = "https://app.pluno.ai";
 const PAIRING_ALARM = "webmcp-pairing";
-const PLUGIN_ERROR =
-  "The Pluno WebMCP for Anything integration is not connected in Claude/Codex.";
 const SETUP_ERROR = "Extension setup is incomplete.";
 const LOCAL_TOOLS_STORAGE_KEY = "webmcpLocalTools";
 const SUBMITTED_FINGERPRINTS_STORAGE_KEY = "webmcpSubmittedToolFingerprints";
@@ -116,11 +114,6 @@ async function activateTab(tabId, pageUrl, staleToolNames, revision) {
     headers: { Authorization: `Bearer ${webmcpToken}` },
   });
   if (tabState.get(tabId)?.revision !== revision) return;
-  if (response.status === 403) {
-    await logPluginError(tabId);
-    updateCurrentTabState(tabId, revision, { injecting: false, loaded: false, lastError: PLUGIN_ERROR });
-    return;
-  }
   if (!response.ok) {
     await logPageError(tabId, `Pluno WebMCP could not load tools (${response.status}).`);
     updateCurrentTabState(tabId, revision, {
@@ -394,17 +387,10 @@ async function unregisterTools(tabId, toolNames) {
   }).catch(() => undefined);
 }
 
-async function logPluginError(tabId) {
-  await logPageError(
-    tabId,
-    `Pluno WebMCP tools were not injected because ${PLUGIN_ERROR}`,
-  );
-}
-
 async function logSetupError(tabId) {
   await logPageError(
     tabId,
-    `Pluno WebMCP tools were not injected because ${SETUP_ERROR} Install and connect the Pluno WebMCP for Anything integration in Claude/Codex.`,
+    `Pluno WebMCP tools were not injected because ${SETUP_ERROR} Connect the Chrome extension to Pluno.`,
   );
 }
 
