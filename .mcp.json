@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "pluno-webmcp": {
-      "type": "http",
-      "url": "https://app.pluno.ai/api/webmcp/mcp"
-    }
-  }
-}

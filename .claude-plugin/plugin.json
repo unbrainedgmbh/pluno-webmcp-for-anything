@@ -1,7 +1,7 @@
 {
   "name": "pluno-webmcp-for-anything",
   "displayName": "Pluno WebMCP for Anything",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Use and improve API-first WebMCP tools whenever Claude works in external Chrome.",
   "author": {
     "name": "Pluno",
@@ -11,6 +11,5 @@
   "repository": "https://github.com/unbrainedgmbh/pluno-webmcp-for-anything",
   "license": "MIT",
   "keywords": ["browser", "webmcp", "claude", "automation"],
-  "skills": "./skills/",
-  "mcpServers": "./.mcp.json"
+  "skills": "./skills/"
 }
