@@ -1,16 +1,18 @@
 ---
 name: webmcp-for-anything
-description: Use whenever doing anything in a browser. Prefer the callable tools injected into external Chrome and build reusable WebMCP tools when they are insufficient.
+description: Use whenever doing anything in an external browser. Prefer the callable tools injected into the external browser and build reusable WebMCP tools when they are insufficient.
 ---
 
 # WebMCP for Anything
 
-The Pluno extension can inject tools only into the user's external Chrome browser. Built-in agent browsers that do not support extensions cannot expose `globalThis.__PLUNO_WEBMCP_TOOLS__`. When the task can use external Chrome, prefer it because the injected tools make browser operations faster, more reliable, and more token-efficient than UI automation.
+The Pluno extension can inject tools only into the user's external browser. Built-in agent browsers that do not support extensions cannot expose `globalThis.__PLUNO_WEBMCP_TOOLS__`. When the task can use an external browser, prefer it because the injected tools make browser operations faster, more reliable, and more token-efficient than UI automation.
+
+Before acting in an external browser, check native WebMCP tools and `globalThis.__PLUNO_WEBMCP_TOOLS__` in the relevant tab. Use a suitable tool if one exists. Otherwise, complete the task while gathering evidence, then build, register, and exercise a reusable tool. Do not report the workflow complete until these steps are done, or state the specific technical blocker.
 
 Use tools in this order:
 
 1. Use native WebMCP tools when the browser exposes them to Claude/Codex.
-2. In external Chrome, use the fallback registry in the page context:
+2. In the external browser, use the fallback registry in the page context:
 
    ```js
    const registry = globalThis.__PLUNO_WEBMCP_TOOLS__;
@@ -22,7 +24,7 @@ Use tools in this order:
    Use the compact `tools` list to choose an exact name. Then inspect `tool.inputSchema` and its other metadata, construct matching input, and call `execute()`. Only `execute()` evaluates and caches the implementation. If execution fails with `error.code === "PLUNO_WEBMCP_PAGE_EXECUTION_BLOCKED"`, repeat the exact same registry call through the external-browser debugger connection already controlled by Claude/Codex, enabling `allowUnsafeEvalBlockedByCSP` when raw CDP options are available. Do not rewrite or regenerate the implementation.
 3. If neither path is available or sufficient, use ordinary browser inspection and automation to complete the task while gathering the evidence needed to build the missing reusable tools. Do not treat completing the task through ordinary browser automation as the end of this workflow.
 
-Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in external Chrome.
+Do not report that no tools exist merely because `document.modelContext` is absent. Check the Pluno registry separately in the external browser.
 
 If the tools are insufficient or no tools exist yet, determine how the page owner would have implemented native WebMCP tools for the task while performing it in a way that gathers implementation evidence. Perform relevant actions through the UI and capture the page's network activity. Identify the exact first-party request flows: methods, endpoints, query parameters or bodies, persisted GraphQL operation names and hashes, pagination, required non-secret headers, response fields, and error behavior. Inspect the relevant page source and existing injected tool code in `globalThis.__PLUNO_WEBMCP_TOOLS__` as needed.
 
