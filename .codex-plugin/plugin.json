@@ -19,6 +19,7 @@
     "category": "Developer Tools",
     "capabilities": ["Write"],
     "websiteURL": "https://pluno.ai",
+    "supportURL": "https://pluno.ai/imprint",
     "privacyPolicyURL": "https://pluno.ai/privacy-policy",
     "termsOfServiceURL": "https://pluno.ai/terms",
     "defaultPrompt": ["Use the browser to complete this task with the available WebMCP tools"],
