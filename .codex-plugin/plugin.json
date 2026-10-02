@@ -1,6 +1,6 @@
 {
   "name": "pluno-webmcp-for-anything",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "Use and improve API-first WebMCP tools whenever Claude/Codex works in a browser.",
   "author": {
     "name": "Pluno",
@@ -19,9 +19,12 @@
     "category": "Developer Tools",
     "capabilities": ["Write"],
     "websiteURL": "https://pluno.ai",
+    "supportURL": "https://pluno.ai/imprint",
     "privacyPolicyURL": "https://pluno.ai/privacy-policy",
     "termsOfServiceURL": "https://pluno.ai/terms",
     "defaultPrompt": ["Use the browser to complete this task with the available WebMCP tools"],
-    "brandColor": "#7C3AED"
+    "brandColor": "#7C3AED",
+    "composerIcon": "./store-assets/pa-bolt-purple-128.png",
+    "logo": "./store-assets/pa-bolt-purple-128.png"
   }
 }
