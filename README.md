@@ -15,7 +15,7 @@ Connect the extension to Pluno to load website tools. Install the Claude/Codex p
 
 The extension injects origin-specific tools automatically on every page.
 
-It registers tools through the standard WebMCP API when available and additionally exposes them in `globalThis.__PLUNO_WEBMCP_TOOLS__` as a workaround when WebMCP is not supported or enabled.
+It registers tools through the standard WebMCP API when available and additionally exposes them in `globalThis.__PLUNO_WEBMCP_TOOLS__` as a workaround when WebMCP is not supported or enabled. Native registrations use an `AbortSignal` retained in the page: replacing a tool or its catalog aborts the previous registration before awaiting its replacement. This prevents duplicate-name failures in current Chrome, which no longer exposes `unregisterTool()`, and removes only tools registered by Pluno. After upgrading from a version that registered tools without signals, reload existing pages once to clear those legacy registrations.
 
 The extension cannot run in built-in agent browsers that do not support Chrome extensions. Use Claude/Codex with external Chrome to get the injected Pluno tools; they make supported browser operations faster, more reliable, and more token-efficient than UI automation.
 
