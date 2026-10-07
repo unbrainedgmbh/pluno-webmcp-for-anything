@@ -251,7 +251,7 @@ async function injectThroughScripting(tabId, tools) {
   });
 }
 
-function installToolsInPage(definitions) {
+async function installToolsInPage(definitions) {
   // External Chrome remains useful before native WebMCP is enabled because the agent can call this registry through code.
   const createCallableTool = (definition) => {
     let implementation;
@@ -282,9 +282,11 @@ function installToolsInPage(definitions) {
       },
     });
   };
-  const registerNativeTool = (definition) => {
+  const registerNativeTool = async (definition) => {
     if (!document.modelContext?.registerTool) return;
-    document.modelContext.unregisterTool?.(definition.name);
+    nativeRegistrations.get(definition.name)?.abort();
+    const controller = new AbortController();
+    nativeRegistrations.set(definition.name, controller);
     const registration = {
       name: definition.name,
       description: definition.description,
@@ -292,7 +294,7 @@ function installToolsInPage(definitions) {
       execute: definition.execute,
     };
     if (definition.annotations) registration.annotations = definition.annotations;
-    document.modelContext.registerTool(registration);
+    await document.modelContext.registerTool(registration, { signal: controller.signal });
   };
   const normalizeDefinition = (candidate) => {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
@@ -319,6 +321,15 @@ function installToolsInPage(definitions) {
     }));
   };
   const callableTools = definitions.map((definition) => createCallableTool(normalizeDefinition(definition)));
+  // Current WebMCP removes tools through AbortSignal. Keep ownership in the page across extension reinjections.
+  const nativeRegistrations = globalThis.__PLUNO_WEBMCP_NATIVE_REGISTRATIONS__ ?? new Map();
+  for (const controller of nativeRegistrations.values()) controller.abort();
+  nativeRegistrations.clear();
+  Object.defineProperty(globalThis, "__PLUNO_WEBMCP_NATIVE_REGISTRATIONS__", {
+    value: nativeRegistrations,
+    configurable: true,
+    enumerable: false,
+  });
   Object.defineProperty(callableTools, "getTool", {
     value: (name) => {
       const tool = callableTools.find((definition) => definition.name === name);
@@ -352,10 +363,10 @@ function installToolsInPage(definitions) {
     value: async (candidate) => {
       const definition = normalizeDefinition(candidate);
       const tool = createCallableTool(definition);
+      await registerNativeTool(tool);
       const existingIndex = callableTools.findIndex((existing) => existing.name === tool.name);
       if (existingIndex === -1) callableTools.push(tool);
       else callableTools.splice(existingIndex, 1, tool);
-      registerNativeTool(tool);
       globalThis.postMessage({
         source: "pluno-webmcp-for-anything",
         type: "WEBMCP_LOCAL_TOOL_ADDED",
@@ -372,7 +383,11 @@ function installToolsInPage(definitions) {
     configurable: true,
     enumerable: false,
   });
-  for (const definition of callableTools) registerNativeTool(definition);
+  for (const definition of callableTools) {
+    // A newer injection can replace the catalog while native registration is being awaited.
+    if (globalThis.__PLUNO_WEBMCP_TOOLS__ !== callableTools) return;
+    await registerNativeTool(definition);
+  }
 }
 
 async function unregisterTools(tabId, toolNames) {
@@ -380,7 +395,10 @@ async function unregisterTools(tabId, toolNames) {
     target: { tabId },
     world: "MAIN",
     func: (names) => {
-      for (const name of names) document.modelContext?.unregisterTool?.(name);
+      for (const name of names) {
+        globalThis.__PLUNO_WEBMCP_NATIVE_REGISTRATIONS__?.get(name)?.abort();
+        globalThis.__PLUNO_WEBMCP_NATIVE_REGISTRATIONS__?.delete(name);
+      }
       delete globalThis.__PLUNO_WEBMCP_TOOLS__;
     },
     args: [toolNames],

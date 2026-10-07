@@ -93,7 +93,7 @@ test("exposes directly callable tools without native WebMCP", async () => {
     code: "(() => { globalThis.evaluationCount += 1; return async (input) => ({ title: input.title }); })()",
   };
   const context = vm.createContext({ document: {}, evaluationCount: 0 });
-  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([lazyDefinition])})`, context);
+  await vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([lazyDefinition])})`, context);
 
   const tools = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
   assert.equal(tools.length, 1);
@@ -109,16 +109,16 @@ test("exposes directly callable tools without native WebMCP", async () => {
 test("registers the same callable tool when native WebMCP exists", async () => {
   const registrations = [];
   const context = vm.createContext({
+    AbortController,
     document: {
       modelContext: {
         registerTool(tool) {
           registrations.push(tool);
         },
-        unregisterTool() {},
       },
     },
   });
-  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+  await vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
 
   const tools = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
   assert.equal(registrations.length, 1);
@@ -136,7 +136,7 @@ test("mirrors native getTools discovery on the fallback registry", async () => {
     name: "archive_title",
     annotations: { readOnlyHint: false },
   };
-  vm.runInContext(
+  await vm.runInContext(
     `(${installToolsInPage.toString()})(${JSON.stringify([definition, secondDefinition])})`,
     context,
   );
@@ -167,7 +167,7 @@ test("mirrors native getTools discovery on the fallback registry", async () => {
 
 test("selects a directly callable fallback tool by name", async () => {
   const context = vm.createContext({ document: {} });
-  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+  await vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
 
   const registry = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
 
@@ -179,16 +179,15 @@ test("selects a directly callable fallback tool by name", async () => {
 
 test("adds a callable tool locally and registers it with native WebMCP", async () => {
   const registrations = [];
-  const unregisteredNames = [];
+  const registrationSignals = [];
   const postedMessages = [];
   const context = vm.createContext({
+    AbortController,
     document: {
       modelContext: {
-        registerTool(tool) {
+        registerTool(tool, { signal }) {
           registrations.push(tool);
-        },
-        unregisterTool(name) {
-          unregisteredNames.push(name);
+          registrationSignals.push(signal);
         },
       },
     },
@@ -197,7 +196,7 @@ test("adds a callable tool locally and registers it with native WebMCP", async (
       postedMessages.push({ message, targetOrigin });
     },
   });
-  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+  await vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
 
   const registry = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__", context);
   const replacement = {
@@ -209,7 +208,8 @@ test("adds a callable tool locally and registers it with native WebMCP", async (
   assert.equal(registry.length, 1);
   assert.equal(registry.getTool("get_title"), tool);
   assert.equal((await tool.execute({ title: "Added" })).title, "Added");
-  assert.deepEqual(unregisteredNames, ["get_title", "get_title"]);
+  assert.equal(registrationSignals[0].aborted, true);
+  assert.equal(registrationSignals[1].aborted, false);
   assert.equal(registrations.length, 2);
   assert.equal(
     JSON.stringify(postedMessages),
@@ -233,7 +233,7 @@ test("reports when page CSP blocks lazy tool evaluation", async () => {
       throw error;
     },
   });
-  vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
+  await vm.runInContext(`(${installToolsInPage.toString()})(${JSON.stringify([definition])})`, context);
 
   const tool = vm.runInContext("globalThis.__PLUNO_WEBMCP_TOOLS__[0]", context);
   await assert.rejects(
